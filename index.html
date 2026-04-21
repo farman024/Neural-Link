@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="NEURAL LINK — Trader Focus Terminal" />
+  <title>NEURAL LINK</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --cyan: #00f3ff;
+      --pink: #ff0055;
+      --cyan-dim: rgba(0, 243, 255, 0.15);
+      --pink-dim: rgba(255, 0, 85, 0.15);
+      --cyan-glow: 0 0 8px #00f3ff, 0 0 20px rgba(0, 243, 255, 0.4);
+      --pink-glow: 0 0 8px #ff0055, 0 0 20px rgba(255, 0, 85, 0.4);
+      --bg: #000000;
+      --surface: #050510;
+      --surface2: #08081a;
+      --text: #c8e8ff;
+      --text-dim: rgba(200, 232, 255, 0.45);
+      --border: rgba(0, 243, 255, 0.2);
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-display: 'Orbitron', monospace;
+      --font-vt: 'VT323', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      overflow-x: hidden;
+    }
+
+    /* ── SCANLINES ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 9999;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.12) 2px,
+        rgba(0, 0, 0, 0.12) 4px
+      );
+      pointer-events: none;
+      animation: scanMove 8s linear infinite;
+    }
+
+    /* ── SCREEN FLICKER ── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 9998;
+      background: transparent;
+      pointer-events: none;
+      animation: flicker 0.15s infinite;
+    }
+
+    @keyframes scanMove {
+      0% { background-position: 0 0; }
+      100% { background-position: 0 40px; }
+    }
+
+    @keyframes flicker {
+      0%, 90%, 100% { opacity: 1; }
+      92% { opacity: 0.94; }
+      94% { opacity: 0.98; }
+      96% { opacity: 0.92; }
+    }
+
+    /* ── LAYOUT ── */
+    #app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 16px 32px;
+      position: relative;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 0 16px;
+      position: relative;
+    }
+
+    .header-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 4px;
+      color: var(--pink);
+      text-shadow: var(--pink-glow);
+      margin-bottom: 6px;
+      animation: blink 2s step-end infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .logo {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 8vw, 38px);
+      font-weight: 900;
+      letter-spacing: 6px;
+      color: var(--cyan);
+      text-shadow: var(--cyan-glow);
+      position: relative;
+    }
+
+    .logo::after {
+      content: 'NEURAL LINK';
+      position: absolute; inset: 0;
+      color: var(--pink);
+      clip-path: polygon(0 40%, 100% 40%, 100% 60%, 0 60%);
+      transform: translate(3px, 0);
+      opacity: 0;
+      animation: glitch 4s infinite;
+    }
+
+    @keyframes glitch {
+      0%, 85%, 100% { opacity: 0; transform: translate(0); }
+      87% { opacity: 0.7; transform: translate(4px, 1px); clip-path: polygon(0 20%, 100% 20%, 100% 35%, 0 35%); }
+      89% { opacity: 0.5; transform: translate(-3px, -1px); clip-path: polygon(0 60%, 100% 60%, 100% 80%, 0 80%); }
+      91% { opacity: 0; }
+    }
+
+    .tagline {
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+
+    .connection-bar {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      margin-top: 20px;
+      position: relative;
+    }
+
+    .connection-bar::before, .connection-bar::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      width: 6px; height: 6px;
+      background: var(--cyan);
+      border-radius: 50%;
+      box-shadow: var(--cyan-glow);
+    }
+    .connection-bar::before { left: 0; }
+    .connection-bar::after { right: 0; }
+
+    /* ── STATUS STRIP ── */
+    .status-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .status-dot.active {
+      background: var(--cyan);
+      box-shadow: var(--cyan-glow);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .status-dot.warn { background: var(--pink); box-shadow: var(--pink-glow); }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.7; }
+    }
+
+    /* ── SESSION CARDS ── */
+    .sessions-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .session-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px 14px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .session-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 2px;
+      background: var(--cyan);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .session-card.active {
+      border-color: var(--cyan);
+      box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.05), 0 0 15px rgba(0, 243, 255, 0.15);
+    }
+    .session-card.active::before { opacity: 1; }
+
+    .session-card.upcoming { border-color: rgba(255, 0, 85, 0.3); }
+    .session-card.upcoming::before { background: var(--pink); opacity: 0.5; }
+
+    .session-label {
+      font-family: var(--font-display);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+    .session-card.active .session-label { color: var(--cyan); text-shadow: var(--cyan-glow); }
+
+    .session-name {
+      font-size: 14px;
+      font-weight: bold;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .session-time {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .session-status-badge {
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 3px 8px;
+      border-radius: 2px;
+      background: var(--cyan-dim);
+      color: var(--cyan);
+      display: inline-block;
+    }
+    .session-card.upcoming .session-status-badge {
+      background: var(--pink-dim);
+      color: var(--pink);
+    }
+    .session-card.offline .session-status-badge {
+      background: rgba(200, 232, 255, 0.05);
+      color: var(--text-dim);
+    }
+    .session-countdown {
+      font-family: var(--font-display);
+      font-size: 13px;
+      color: var(--cyan);
+      margin-top: 6px;
+    }
+
+    /* ── MAIN RING ── */
+    .ring-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 0 20px;
+    }
+
+    .ring-container {
+      position: relative;
+      width: 200px; height: 200px;
+    }
+
+    .ring-svg {
+      width: 100%; height: 100%;
+      transform: rotate(-90deg);
+      filter: drop-shadow(0 0 6px var(--cyan));
+    }
+
+    .ring-bg { fill: none; stroke: rgba(0, 243, 255, 0.08); stroke-width: 8; }
+    .ring-progress {
+      fill: none;
+      stroke: url(#ringGrad);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 565;
+      stroke-dashoffset: 565;
+      transition: stroke-dashoffset 1s ease;
+    }
+
+    .ring-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ring-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .ring-value {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 900;
+      color: var(--cyan);
+      text-shadow: var(--cyan-glow);
+      line-height: 1;
+      animation: ringGlitch 6s infinite;
+    }
+
+    @keyframes ringGlitch {
+      0%, 95%, 100% { transform: translate(0); }
+      96% { transform: translate(2px, -1px); color: var(--pink); }
+      97% { transform: translate(-2px, 1px); }
+      98% { transform: translate(0); color: var(--cyan); }
+    }
+
+    .ring-sub {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* ── SYNC RATE BARS ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .metric-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px;
+    }
+
+    .metric-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+    .metric-value.pink { color: var(--pink); text-shadow: var(--pink-glow); }
+
+    .metric-bar-bg {
+      width: 100%;
+      height: 3px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--cyan);
+      box-shadow: var(--cyan-glow);
+      transition: width 0.5s ease;
+    }
+    .metric-bar-fill.pink { background: var(--pink); box-shadow: var(--pink-glow); }
+
+    /* ── RANK CARD ── */
+    .rank-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 16px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .rank-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 80px; height: 80px;
+      background: radial-gradient(circle at bottom right, var(--pink-dim), transparent 70%);
+      pointer-events: none;
+    }
+
+    .rank-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .rank-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+    }
+
+    .rank-xp {
+      font-size: 11px;
+      color: var(--pink);
+      letter-spacing: 1px;
+    }
+
+    .rank-name {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--pink);
+      text-shadow: var(--pink-glow);
+      margin-bottom: 4px;
+      letter-spacing: 2px;
+    }
+
+    .rank-next {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    .xp-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .xp-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--pink), var(--cyan));
+      box-shadow: 0 0 10px var(--pink);
+      transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+    }
+
+    .xp-bar-fill::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0;
+      width: 4px; height: 100%;
+      background: white;
+      border-radius: 3px;
+      box-shadow: 0 0 8px white;
+      animation: xpPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes xpPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── BOUNTY BOARD ── */
+    .bounty-section {
+      margin-bottom: 16px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--cyan);
+    }
+
+    .section-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .bounty-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .bounty-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: border-color 0.3s, background 0.3s;
+    }
+
+    .bounty-item.claimed {
+      border-color: var(--cyan);
+      background: rgba(0, 243, 255, 0.04);
+    }
+
+    .bounty-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .bounty-text { flex: 1; }
+
+    .bounty-name {
+      font-size: 11px;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .bounty-req {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    .bounty-check {
+      width: 16px; height: 16px;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+
+    .bounty-item.claimed .bounty-check {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      box-shadow: var(--cyan-glow);
+    }
+
+    /* ── MAIN BUTTON ── */
+    .btn-main {
+      width: 100%;
+      padding: 18px;
+      background: transparent;
+      border: 1px solid var(--cyan);
+      border-radius: 4px;
+      color: var(--cyan);
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s;
+      box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.05), 0 0 20px rgba(0, 243, 255, 0.1);
+      margin-bottom: 12px;
+    }
+
+    .btn-main::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.15), transparent);
+      transition: left 0.4s;
+    }
+
+    .btn-main:hover::before { left: 100%; }
+    .btn-main:hover {
+      background: rgba(0, 243, 255, 0.08);
+      box-shadow: inset 0 0 30px rgba(0, 243, 255, 0.1), 0 0 30px rgba(0, 243, 255, 0.3);
+      text-shadow: var(--cyan-glow);
+    }
+
+    .btn-main.active {
+      border-color: var(--pink);
+      color: var(--pink);
+      box-shadow: inset 0 0 20px rgba(255, 0, 85, 0.05), 0 0 20px rgba(255, 0, 85, 0.2);
+    }
+    .btn-main.active:hover { box-shadow: inset 0 0 30px rgba(255, 0, 85, 0.1), 0 0 30px rgba(255, 0, 85, 0.4); }
+
+    .btn-audio {
+      width: 100%;
+      padding: 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-bottom: 16px;
+    }
+
+    .btn-audio:hover { border-color: var(--cyan); color: var(--cyan); }
+    .btn-audio.on { border-color: var(--cyan); color: var(--cyan); text-shadow: var(--cyan-glow); }
+
+    /* ── TERMINAL LOG ── */
+    .terminal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: rgba(0, 243, 255, 0.05);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .term-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+    .term-dot:nth-child(1) { background: #ff5f57; }
+    .term-dot:nth-child(2) { background: #febc2e; }
+    .term-dot:nth-child(3) { background: #28c840; }
+
+    .term-title {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-left: 6px;
+    }
+
+    .terminal-body {
+      padding: 12px;
+      height: 160px;
+      overflow-y: auto;
+      font-family: var(--font-vt);
+      font-size: 16px;
+      line-height: 1.6;
+      scrollbar-width: thin;
+      scrollbar-color: var(--cyan) transparent;
+    }
+
+    .terminal-body::-webkit-scrollbar { width: 3px; }
+    .terminal-body::-webkit-scrollbar-track { background: transparent; }
+    .terminal-body::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 2px; }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 2px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+    .log-time { color: var(--text-dim); flex-shrink: 0; }
+    .log-msg { color: var(--text); }
+    .log-msg.cyan { color: var(--cyan); }
+    .log-msg.pink { color: var(--pink); }
+    .log-msg.warn { color: #ffcc00; }
+
+    /* ── UPLINK LOST OVERLAY ── */
+    #uplink-lost {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 0, 85, 0.06);
+      z-index: 100;
+      border: 2px solid var(--pink);
+      pointer-events: none;
+      animation: lostFlicker 0.5s infinite;
+    }
+
+    @keyframes lostFlicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    #uplink-lost-msg {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 101;
+      background: var(--surface2);
+      border: 1px solid var(--pink);
+      padding: 20px 30px;
+      text-align: center;
+      box-shadow: 0 0 40px rgba(255, 0, 85, 0.3);
+    }
+
+    #uplink-lost-msg .warn-title {
+      font-family: var(--font-display);
+      font-size: 16px;
+      color: var(--pink);
+      letter-spacing: 3px;
+      text-shadow: var(--pink-glow);
+      margin-bottom: 8px;
+    }
+
+    #uplink-lost-msg .warn-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      font-size: 12px;
+      letter-spacing: 2px;
+      padding: 10px 20px;
+      border-radius: 2px;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 9997;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.pink-toast { border-color: var(--pink); color: var(--pink); box-shadow: 0 0 20px rgba(255, 0, 85, 0.3); }
+
+    /* ── NOTIFICATION PERMISSION BANNER ── */
+    #notif-banner {
+      background: rgba(255, 0, 85, 0.08);
+      border: 1px solid rgba(255, 0, 85, 0.3);
+      border-radius: 4px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    #notif-banner button {
+      background: var(--pink-dim);
+      border: 1px solid var(--pink);
+      color: var(--pink);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 1px;
+      padding: 4px 12px;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Uplink Lost Overlay -->
+  <div id="uplink-lost"></div>
+  <div id="uplink-lost-msg">
+    <div class="warn-title">⚠ UPLINK SEVERED</div>
+    <div class="warn-sub">SYNC RATE DEGRADING...</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="app">
+    <!-- HEADER -->
+    <div class="header">
+      <div class="header-tag">▸ SYSTEM ONLINE ◂</div>
+      <div class="logo">NEURAL LINK</div>
+      <div class="tagline">// TRADER FOCUS TERMINAL //</div>
+      <div class="connection-bar"></div>
+    </div>
+
+    <!-- STATUS STRIP -->
+    <div class="status-strip">
+      <span><span class="status-dot" id="uplink-dot"></span><span id="uplink-status">UPLINK INACTIVE</span></span>
+      <span id="current-time">--:--:--</span>
+    </div>
+
+    <!-- NOTIFICATION BANNER -->
+    <div id="notif-banner">
+      <span>⚡ Enable alerts for session warnings</span>
+      <button onclick="requestNotifPermission()">ENABLE</button>
+    </div>
+
+    <!-- SESSION CARDS -->
+    <div class="sessions-row">
+      <div class="session-card offline" id="card-london">
+        <div class="session-label">SESSION_01</div>
+        <div class="session-name">LONDON</div>
+        <div class="session-time">12:30 – 14:30 IST</div>
+        <div class="session-status-badge" id="badge-london">OFFLINE</div>
+        <div class="session-countdown" id="countdown-london"></div>
+      </div>
+      <div class="session-card offline" id="card-ny">
+        <div class="session-label">SESSION_02</div>
+        <div class="session-name">NEW YORK</div>
+        <div class="session-time">17:30 – 20:00 IST</div>
+        <div class="session-status-badge" id="badge-ny">OFFLINE</div>
+        <div class="session-countdown" id="countdown-ny"></div>
+      </div>
+    </div>
+
+    <!-- MAIN SYNC RING -->
+    <div class="ring-wrapper">
+      <svg class="ring-svg" viewBox="0 0 200 200">
+        <defs>
+          <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#ff0055" />
+            <stop offset="100%" style="stop-color:#00f3ff" />
+          </linearGradient>
+        </defs>
+        <circle class="ring-bg" cx="100" cy="100" r="90" />
+        <circle class="ring-progress" id="ring-progress" cx="100" cy="100" r="90" />
+      </svg>
+      <div class="ring-container" style="position:absolute;width:200px;height:200px;">
+        <div class="ring-center">
+          <div class="ring-label">SYNC RATE</div>
+          <div class="ring-value" id="sync-rate">0%</div>
+          <div class="ring-sub" id="session-timer">--:--</div>
+        </div>
+      </div>
+    </div>
+    <!-- spacer to push content below absolute ring -->
+    <div style="height:220px;"></div>
+
+    <!-- METRICS -->
+    <div class="metrics-grid">
+      <div class="metric-box">
+        <div class="metric-label">FOCUS MINUTES</div>
+        <div class="metric-value" id="focus-mins">0</div>
+        <div class="metric-bar-bg">
+          <div class="metric-bar-fill" id="focus-bar" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">DRIFT EVENTS</div>
+        <div class="metric-value pink" id="drift-count">0</div>
+        <div class="metric-bar-bg">
+          <div class="metric-bar-fill pink" id="drift-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RANK CARD -->
+    <div class="rank-card">
+      <div class="rank-header">
+        <div class="rank-label">▸ BOUNTY RANK</div>
+        <div class="rank-xp" id="xp-display">0 XP</div>
+      </div>
+      <div class="rank-name" id="rank-name">GLITCH-RUNNER</div>
+      <div class="rank-next" id="rank-next">Next: CIPHER-GHOST @ 60 XP</div>
+      <div class="xp-bar-bg">
+        <div class="xp-bar-fill" id="xp-bar" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- BOUNTY BOARD -->
+    <div class="bounty-section">
+      <div class="section-header">
+        <div class="section-title">BOUNTY BOARD</div>
+        <div class="section-line"></div>
+      </div>
+      <div class="bounty-grid" id="bounty-grid">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <button class="btn-main" id="btn-uplink" onclick="toggleUplink()">⚡ START UPLINK</button>
+    <button class="btn-audio" id="btn-audio" onclick="toggleAudio()">◉ AMBIENCE: OFF</button>
+
+    <!-- TERMINAL -->
+    <div class="section-header" style="margin-bottom:10px;">
+      <div class="section-title">TERMINAL READOUT</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="terminal">
+      <div class="terminal-header">
+        <div class="term-dot"></div>
+        <div class="term-dot"></div>
+        <div class="term-dot"></div>
+        <div class="term-title">NEURAL_LINK_v1.0 // SESSION_LOG</div>
+      </div>
+      <div class="terminal-body" id="terminal-body">
+        <div class="log-line">
+          <span class="log-time">--:--:--</span>
+          <span class="log-msg cyan">▸ SYSTEM BOOT COMPLETE</span>
+        </div>
+        <div class="log-line">
+          <span class="log-time">--:--:--</span>
+          <span class="log-msg">Awaiting uplink initialization...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">NEURAL LINK v1.0 // FARMAN J · AI GENERALIST</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
