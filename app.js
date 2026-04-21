@@ -23,13 +23,56 @@ const RANKS = [
 
 // ── BOUNTIES ──
 const BOUNTIES = [
-  { id: 'b1', icon: '⚡', name: 'First Sync',     req: '1 min focused',   xpReq: 1  },
-  { id: 'b2', icon: '🎯', name: 'Full Session',   req: '60 mins in slot', xpReq: 60 },
-  { id: 'b3', icon: '🔥', name: 'No Drift',       req: '0 tab switches',  xpReq: 0, special: 'nodrift' },
-  { id: 'b4', icon: '👁', name: 'Ghost Protocol', req: '30 mins no drift',xpReq: 0, special: 'ghost30' },
-  { id: 'b5', icon: '⚔', name: 'Double Session', req: 'Both sessions',   xpReq: 0, special: 'double' },
-  { id: 'b6', icon: '💀', name: 'Iron Trader',   req: '3 days streak',   xpReq: 0, special: 'streak3' },
+  { id: 'b1', icon: 'b1', name: 'First Sync',     req: '1 min focused',   xpReq: 1  },
+  { id: 'b2', icon: 'b2', name: 'Full Session',   req: '60 mins in slot', xpReq: 60 },
+  { id: 'b3', icon: 'b3', name: 'No Drift',       req: '0 tab switches',  xpReq: 0, special: 'nodrift' },
+  { id: 'b4', icon: 'b4', name: 'Ghost Protocol', req: '30 mins no drift',xpReq: 0, special: 'ghost30' },
+  { id: 'b5', icon: 'b5', name: 'Double Session', req: 'Both sessions',   xpReq: 0, special: 'double' },
+  { id: 'b6', icon: 'b6', name: 'Iron Trader',    req: '3 days streak',   xpReq: 0, special: 'streak3' },
 ];
+
+// ── SVG ICONS (inline cyberpunk, neon glow) ──
+const SVG_ICONS = {
+  // Lightning bolt — Start Uplink button
+  power: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:8px;filter:drop-shadow(0 0 5px #00f3ff)">
+    <polygon points="13,2 4,14 12,14 11,22 20,10 12,10" fill="#00f3ff" stroke="#00f3ff" stroke-width="1" stroke-linejoin="round"/>
+  </svg>`,
+
+  // Stop/terminate — active uplink
+  terminate: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:8px;filter:drop-shadow(0 0 5px #ff0055)">
+    <rect x="4" y="4" width="16" height="16" rx="2" fill="#ff0055" opacity="0.9"/>
+    <line x1="9" y1="9" x2="15" y2="15" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="15" y1="9" x2="9" y2="15" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`,
+
+  // Radar — audio/ambience button
+  radar: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:8px;filter:drop-shadow(0 0 5px #00f3ff)">
+    <circle cx="12" cy="12" r="2" fill="#00f3ff"/>
+    <path d="M12 12 L20 4" stroke="#00f3ff" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="12" cy="12" r="5" stroke="#00f3ff" stroke-width="1" opacity="0.5" fill="none"/>
+    <circle cx="12" cy="12" r="9" stroke="#00f3ff" stroke-width="1" opacity="0.3" fill="none"/>
+    <circle cx="12" cy="12" r="1" fill="#ff0055" style="filter:drop-shadow(0 0 3px #ff0055)"/>
+  </svg>`,
+
+  // Military chevron — rank
+  chevron: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;filter:drop-shadow(0 0 5px #ff0055)">
+    <polyline points="4,8 12,16 20,8" stroke="#ff0055" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <polyline points="4,13 12,21 20,13" stroke="#ff0055" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.5"/>
+  </svg>`,
+
+  // Pulse/brain wave — sync
+  pulse: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;filter:drop-shadow(0 0 5px #00f3ff)">
+    <polyline points="2,12 6,12 8,5 10,19 12,10 14,14 16,12 22,12" stroke="#00f3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </svg>`,
+
+  // Bounty icons per item (inline small SVGs)
+  b1: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 4px #00f3ff)"><polygon points="13,2 4,14 12,14 11,22 20,10 12,10" fill="#00f3ff"/></svg>`,
+  b2: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 4px #00f3ff)"><circle cx="12" cy="12" r="9" stroke="#00f3ff" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="3" fill="#00f3ff"/></svg>`,
+  b3: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 4px #ff0055)"><path d="M12 2 L15 9 L22 9 L16 14 L18 21 L12 17 L6 21 L8 14 L2 9 L9 9 Z" fill="#ff0055"/></svg>`,
+  b4: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 4px #00f3ff)"><circle cx="12" cy="8" r="4" stroke="#00f3ff" stroke-width="2" fill="none"/><path d="M4 20 Q12 14 20 20" stroke="#00f3ff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`,
+  b5: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 4px #ff0055)"><rect x="3" y="3" width="8" height="8" rx="1" fill="none" stroke="#ff0055" stroke-width="2"/><rect x="13" y="3" width="8" height="8" rx="1" fill="none" stroke="#ff0055" stroke-width="2"/><rect x="3" y="13" width="8" height="8" rx="1" fill="none" stroke="#ff0055" stroke-width="2"/><rect x="13" y="13" width="8" height="8" rx="1" fill="none" stroke="#00f3ff" stroke-width="2"/></svg>`,
+  b6: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 4px #ff0055)"><path d="M12 2 L14 8 L20 8 L15 12 L17 18 L12 15 L7 18 L9 12 L4 8 L10 8 Z" fill="none" stroke="#ff0055" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="11" r="2" fill="#ff0055"/></svg>`,
+};
 
 // ── STATE ──
 let state = {
@@ -176,13 +219,13 @@ function toggleAudio() {
   if (state.audioOn) {
     buildAmbience();
     masterGain.gain.setTargetAtTime(0.6, audioCtx.currentTime, 1.5);
-    btn.textContent = '◉ AMBIENCE: ON';
+    btn.innerHTML = SVG_ICONS.radar + ' AMBIENCE: ON';
     btn.classList.add('on');
     log('Cyberpunk ambience activated.', 'cyan');
   } else {
     masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 1.5);
     setTimeout(() => stopAmbience(), 2000);
-    btn.textContent = '◉ AMBIENCE: OFF';
+    btn.innerHTML = SVG_ICONS.radar + ' AMBIENCE: OFF';
     btn.classList.remove('on');
     log('Ambience disengaged.', '');
   }
@@ -326,8 +369,11 @@ function showToast(msg, pink = false) {
 }
 
 // ── UPLINK TOGGLE ──
-let uplinkInterval = null;
-let sessionMinuteTimer = null;
+// These are on window so they can never be garbage-collected or shadowed
+window._uplinkInterval = null;
+window._sessionMinuteTimer = null;
+window._uplinkStartTime = null;   // ms timestamp when uplink went live
+window._uplinkSeconds = 0;        // raw elapsed seconds since uplink start
 
 function toggleUplink() {
   state.uplinkActive = !state.uplinkActive;
@@ -336,7 +382,7 @@ function toggleUplink() {
   const status = document.getElementById('uplink-status');
 
   if (state.uplinkActive) {
-    btn.textContent = '⛔ TERMINATE UPLINK';
+    btn.innerHTML = SVG_ICONS.terminate + ' TERMINATE UPLINK';
     btn.classList.add('active');
     dot.classList.add('active');
     status.textContent = 'UPLINK ACTIVE';
@@ -344,42 +390,57 @@ function toggleUplink() {
     speak('Neural link established. Focus protocol active. Watch the charts, trader.');
     showToast('UPLINK ONLINE');
 
-    // Reset session counters
+    // Reset all session counters
     state.focusMinutes = 0;
     state.driftCount = 0;
     state.sessionsCompleted = [];
     state.ghostMinutes = 0;
 
+    // Sync engine — record exact start time
+    window._uplinkStartTime = Date.now();
+    window._uplinkSeconds = 0;
+
     startFocusTracking();
   } else {
-    btn.textContent = '⚡ START UPLINK';
+    btn.innerHTML = SVG_ICONS.power + ' START UPLINK';
     btn.classList.remove('active');
     dot.classList.remove('active');
     status.textContent = 'UPLINK INACTIVE';
-    log('Uplink terminated. Session data archived.', 'pink');
+    log(`Uplink terminated after ${Math.floor(window._uplinkSeconds / 60)}m ${window._uplinkSeconds % 60}s. Session archived.`, 'pink');
     speak('Uplink severed. Session archived. Stand down, netrunner.');
     showToast('UPLINK OFFLINE', true);
 
     stopFocusTracking();
-    updateRing(0);
+    // Reset ring display but keep XP
+    window._uplinkStartTime = null;
+    window._uplinkSeconds = 0;
+    updateRing(0, true);
   }
 }
 
 // ── FOCUS TRACKING ──
-let announcedEvents = {};  // track which events fired per session
+let announcedEvents = {};
 
 function startFocusTracking() {
   announcedEvents = {};
 
-  uplinkInterval = setInterval(() => {
+  // Clear any stale intervals defensively
+  if (window._uplinkInterval) clearInterval(window._uplinkInterval);
+  if (window._sessionMinuteTimer) clearInterval(window._sessionMinuteTimer);
+
+  // Primary tick — every second, always
+  window._uplinkInterval = setInterval(() => {
     if (!state.uplinkActive) return;
+    // Advance uplink clock
+    if (window._uplinkStartTime) {
+      window._uplinkSeconds = Math.floor((Date.now() - window._uplinkStartTime) / 1000);
+    }
     tickUI();
   }, 1000);
 
-  // XP tick every 60s of focus
-  sessionMinuteTimer = setInterval(() => {
+  // XP + focus minute tick — every 60s, only during market sessions
+  window._sessionMinuteTimer = setInterval(() => {
     if (!state.uplinkActive || document.visibilityState === 'hidden') return;
-    // Only award XP during active session
     const inLondon = getSessionState('london').status === 'active';
     const inNY = getSessionState('ny').status === 'active';
     if (inLondon || inNY) {
@@ -393,10 +454,10 @@ function startFocusTracking() {
 }
 
 function stopFocusTracking() {
-  clearInterval(uplinkInterval);
-  clearInterval(sessionMinuteTimer);
-  uplinkInterval = null;
-  sessionMinuteTimer = null;
+  clearInterval(window._uplinkInterval);
+  clearInterval(window._sessionMinuteTimer);
+  window._uplinkInterval = null;
+  window._sessionMinuteTimer = null;
 }
 
 function tickUI() {
@@ -415,16 +476,26 @@ function tickUI() {
                : null;
 
   if (active) {
-    const pct = Math.round((active.elapsed / active.total) * 100);
-    updateRing(pct);
+    // ── IN SESSION: ring = session progress (minute-granularity) ──
+    const pct = Math.min(Math.round((active.elapsed / active.total) * 100), 100);
+    const displayPct = document.visibilityState === 'hidden'
+      ? Math.max(pct - 5, 0)   // penalise 5% for drifting away
+      : pct;
+    updateRing(displayPct, false);
     document.getElementById('session-timer').textContent = fmtMins(active.remaining) + ' LEFT';
-    document.getElementById('sync-rate').textContent =
-      document.visibilityState === 'hidden' ? 'OFF' : pct + '%';
   } else {
-    document.getElementById('session-timer').textContent = '--:--';
-    if (!state.uplinkActive) {
-      document.getElementById('sync-rate').textContent = '0%';
-    }
+    // ── OUTSIDE SESSION: ring = uplink elapsed seconds / 3600 (1hr cap) ──
+    // This makes sync move immediately from the first second uplink is pressed
+    const totalSyncWindow = 3600; // 1 hour reference window
+    const elapsed = window._uplinkSeconds || 0;
+    const pct = Math.min(Math.round((elapsed / totalSyncWindow) * 100), 100);
+    const driftPenalty = state.driftCount * 3; // each drift costs 3%
+    const displayPct = Math.max(pct - driftPenalty, 0);
+    updateRing(displayPct, false);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    document.getElementById('session-timer').textContent =
+      `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')} UPLINK`;
   }
 
   // Check announcements
@@ -499,8 +570,14 @@ function updateSessionCard(key, ss) {
 }
 
 // ── RING ──
-function updateRing(pct) {
-  const circ = 2 * Math.PI * 90; // 565.48...
+function updateRing(pct, reset = false) {
+  const circ = 2 * Math.PI * 90; // 565.48
+  if (reset) {
+    document.getElementById('ring-progress').style.strokeDashoffset = circ;
+    document.getElementById('sync-rate').textContent = '0%';
+    document.getElementById('session-timer').textContent = '--:--';
+    return;
+  }
   const offset = circ - (pct / 100) * circ;
   document.getElementById('ring-progress').style.strokeDashoffset = offset;
   document.getElementById('sync-rate').textContent = pct + '%';
@@ -587,7 +664,7 @@ function renderBounties() {
     const item = document.createElement('div');
     item.className = 'bounty-item' + (claimed ? ' claimed' : '');
     item.innerHTML = `
-      <div class="bounty-icon">${b.icon}</div>
+      <div class="bounty-icon">${SVG_ICONS[b.icon] || ''}</div>
       <div class="bounty-text">
         <div class="bounty-name">${b.name}</div>
         <div class="bounty-req">${b.req}</div>
@@ -669,6 +746,18 @@ window.requestNotifPermission = requestNotifPermission;
   renderBounties();
   updateRankUI();
   updateMetrics();
+
+  // Inject SVG icons into buttons
+  document.getElementById('btn-uplink').innerHTML = SVG_ICONS.power + ' START UPLINK';
+  document.getElementById('btn-audio').innerHTML = SVG_ICONS.radar + ' AMBIENCE: OFF';
+
+  // Inject SVG into rank card label
+  const rankLabel = document.getElementById('rank-label-el');
+  if (rankLabel) rankLabel.innerHTML = SVG_ICONS.chevron + ' BOUNTY RANK';
+
+  // Inject SVG pulse into ring label
+  const ringLabel = document.getElementById('ring-label-el');
+  if (ringLabel) ringLabel.innerHTML = SVG_ICONS.pulse + ' SYNC';
 
   // Populate time immediately
   document.getElementById('current-time').textContent = fmtTimeHMS(getISTNow());
