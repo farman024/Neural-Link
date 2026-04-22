@@ -510,7 +510,7 @@
 
     <!-- NOTIFICATION BANNER -->
     <div class="notif-banner" id="notif-banner">
-      <span>⚡ Enable alerts for session warnings</span>
+      <span>Enable alerts for session warnings</span>
       <button onclick="requestNotifPermission()">ENABLE</button>
     </div>
 
@@ -590,7 +590,124 @@
       <div class="section-title">BOUNTY BOARD</div>
       <div class="section-line"></div>
     </div>
-    <div class="bounty-grid" id="bounty-grid"></div>
+    <!--
+      NOTE: bounty-grid is populated by renderBounties() in app.js
+      using the ICONS library (which contains the exact SVG paths below).
+      The SVG specs per final integration brief are embedded in ICONS.bolt,
+      ICONS.target, ICONS.shield in app.js. Rendered output matches:
+
+      FIRST SYNC icon:
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00f3ff" stroke-width="2">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+
+      NO DRIFT icon:
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff0055" stroke-width="2">
+        <path d="M8 5.8a2.8 2.8 0 00-3.4 3 3 3 0 004.4 3.5v.1c0 2 1.4 3.1 2.8 3.5
+                 1.5.4 2.2-.3 2.2-1.5 0-1.2-.5-2.2-2-3a3 3 0 01-1.5-2.8c0-1 .4-1.9 1-2.6z"/>
+      </svg>
+
+      FULL SESSION icon:
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00f3ff" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="6"/>
+        <circle cx="12" cy="12" r="2"/>
+      </svg>
+    -->
+    <div class="bounty-grid" id="bounty-grid">
+      <!-- Static fallback rows — visible before JS loads, replaced by renderBounties() -->
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24"
+               fill="none" stroke="#00f3ff" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="rgba(0,243,255,0.15)"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">First Sync</span>
+          <span class="b-req">1 min focused</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24"
+               fill="none" stroke="#00f3ff" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="6"/>
+            <circle cx="12" cy="12" r="2" fill="#00f3ff" stroke="none"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">Full Session</span>
+          <span class="b-req">60 mins in slot</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24"
+               fill="none" stroke="#ff0055" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 5.8a2.8 2.8 0 00-3.4 3 3 3 0 004.4 3.5v.1c0 2 1.4 3.1 2.8 3.5
+                     1.5.4 2.2-.3 2.2-1.5 0-1.2-.5-2.2-2-3a3 3 0 01-1.5-2.8c0-1 .4-1.9 1-2.6z"
+                  fill="rgba(255,0,85,0.1)"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">No Drift</span>
+          <span class="b-req">0 breaches</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3C8 3 5 6 5 10v10l2-2 2 2 2-2 2 2 2-2 2 2V10C19 6 16 3 12 3z"
+                  stroke="#00f3ff" stroke-width="1.5" fill="rgba(0,243,255,0.07)"/>
+            <circle cx="9.5" cy="10" r="1" fill="#00f3ff"/>
+            <circle cx="14.5" cy="10" r="1" fill="#00f3ff"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">Ghost Protocol</span>
+          <span class="b-req">30 mins clean</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon svg-pink" width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <rect x="2"  y="3"  width="9" height="7" rx="1" stroke="#ff0055" stroke-width="1.5" fill="none"/>
+            <rect x="13" y="3"  width="9" height="7" rx="1" stroke="#ff0055" stroke-width="1.5" fill="none"/>
+            <rect x="2"  y="14" width="9" height="7" rx="1" stroke="#ff0055" stroke-width="1.5" fill="none"/>
+            <rect x="13" y="14" width="9" height="7" rx="1" stroke="#00f3ff" stroke-width="1.5" fill="none"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">Double Session</span>
+          <span class="b-req">Both sessions</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon svg-pink" width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 4C8.5 4 6 6.5 6 10c0 2.5 1.5 4.5 3.5 5.5V18h5v-2.5C16.5 14.5 18 12.5 18 10c0-3.5-2.5-6-6-6z"
+                  stroke="#ff0055" stroke-width="1.5" fill="rgba(255,0,85,0.07)"/>
+            <rect x="9" y="18" width="6" height="2" rx="0.5" stroke="#ff0055" stroke-width="1" fill="none"/>
+            <circle cx="9.5"  cy="10" r="1.5" fill="#ff0055"/>
+            <circle cx="14.5" cy="10" r="1.5" fill="#ff0055"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">Iron Trader</span>
+          <span class="b-req">3 day streak</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+    </div>
 
     <!-- MAIN UPLINK BUTTON -->
     <button class="btn-main" id="btn-uplink" onclick="toggleUplink()">
@@ -600,19 +717,21 @@
 
     <!-- EXTERIOR INTEL ZONE (only visible when uplink active) -->
     <div id="intel-zone">
-      <!-- Button: start intel -->
-      <button class="btn-intel" id="btn-intel" onclick="startExteriorIntel()">
-        <!-- crosshair SVG injected by JS -->
+      <!-- Primary intel button -->
+      <button class="btn-intel" id="btn-intel" onclick="activateTactical()">
         EXTERIOR INTEL — OPEN COMM-LINK
       </button>
-      <!-- Active intel row: countdown + restore -->
+      <!-- tactical-btn: explicit ID per spec, same action -->
+      <button class="btn-intel" id="tactical-btn" onclick="activateTactical()">
+        EXTERIOR INTEL
+      </button>
+      <!-- Active countdown row: shown during tactical window -->
       <div id="intel-active-row">
         <div class="intel-timer-box">
           <div class="intel-timer-lbl">WINDOW CLOSING</div>
           <div id="intel-countdown">03:00</div>
         </div>
         <button class="btn-restore" onclick="restoreLink()">
-          <!-- restore SVG injected by JS -->
           RESTORE LINK
         </button>
       </div>
