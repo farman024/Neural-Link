@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#000000"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="description" content="NEURAL LINK — Trader Focus Terminal"/>
+  <title>NEURAL LINK</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" type="image/png" href="icon-192.png"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+  <style>
+    /* ── TOKENS ── */
+    :root {
+      --c:   #00f3ff;   /* cyan */
+      --p:   #ff0055;   /* pink */
+      --bg:  #000000;
+      --s1:  #04040f;
+      --s2:  #07071a;
+      --txt: #b8d8f0;
+      --dim: rgba(184,216,240,0.4);
+      --bc:  rgba(0,243,255,0.18);
+      --gC:  0 0 8px #00f3ff, 0 0 22px rgba(0,243,255,0.35);
+      --gP:  0 0 8px #ff0055, 0 0 22px rgba(255,0,85,0.35);
+      --fm:  'Roboto Mono', monospace;
+      --fd:  'Orbitron', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--txt);
+      font-family: var(--fm);
+      overflow-x: hidden;
+    }
+
+    /* ── SVG ICON GLOW ── */
+    .svg-icon      { display: inline-block; vertical-align: middle; filter: drop-shadow(0 0 5px #00f3ff); flex-shrink: 0; }
+    .svg-icon.svg-pink { filter: drop-shadow(0 0 5px #ff0055); }
+
+    /* ── SCANLINES ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px);
+      animation: scanMove 10s linear infinite;
+    }
+    @keyframes scanMove { to { background-position: 0 40px; } }
+
+    /* Screen flicker */
+    body::after {
+      content: ''; position: fixed; inset: 0; z-index: 9998; pointer-events: none;
+      animation: flicker 8s infinite;
+    }
+    @keyframes flicker {
+      0%,89%,100% { opacity: 1; }
+      90% { opacity: 0.93; } 92% { opacity: 0.97; } 94% { opacity: 0.91; }
+    }
+
+    /* ── LAYOUT ── */
+    #app {
+      min-height: 100vh;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 16px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── HEADER ── */
+    .hdr {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 28px 0 12px; gap: 4px;
+    }
+    .hdr-tag {
+      font-size: 10px; letter-spacing: 4px; color: var(--p);
+      text-shadow: var(--gP); animation: blink 2s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .logo {
+      font-family: var(--fd);
+      font-size: clamp(26px, 7.5vw, 36px);
+      font-weight: 900; letter-spacing: 6px;
+      color: var(--c); text-shadow: var(--gC);
+      position: relative;
+    }
+    /* Glitch layer */
+    .logo::after {
+      content: 'NEURAL LINK'; position: absolute; inset: 0;
+      color: var(--p); opacity: 0;
+      clip-path: polygon(0 35%, 100% 35%, 100% 55%, 0 55%);
+      animation: logoGlitch 5s infinite;
+    }
+    @keyframes logoGlitch {
+      0%,84%,100% { opacity:0; transform:translate(0); }
+      86% { opacity:0.7; transform:translate(4px,1px); }
+      88% { opacity:0.4; transform:translate(-3px,-1px); }
+      90% { opacity:0; }
+    }
+
+    .tagline { font-size: 10px; letter-spacing: 3px; color: var(--dim); }
+
+    .hdr-line {
+      width: 100%; height: 1px; margin-top: 14px;
+      background: linear-gradient(90deg, transparent, var(--c), transparent);
+      position: relative;
+    }
+    .hdr-line::before, .hdr-line::after {
+      content: ''; position: absolute; top: -3px;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--c); box-shadow: var(--gC);
+    }
+    .hdr-line::before { left: 0; }
+    .hdr-line::after  { right: 0; }
+
+    /* ── STATUS STRIP ── */
+    .status-strip {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 11px; letter-spacing: 1.5px; color: var(--dim);
+      padding: 4px 0;
+    }
+    .status-left { display: flex; align-items: center; gap: 6px; }
+    .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--dim); flex-shrink: 0;
+    }
+    .dot.active {
+      background: var(--c); box-shadow: var(--gC);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 50% { transform:scale(1.5); opacity:0.6; } }
+
+    /* ── NOTIF BANNER ── */
+    .notif-banner {
+      background: rgba(255,0,85,0.07);
+      border: 1px solid rgba(255,0,85,0.3);
+      border-radius: 3px; padding: 9px 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 11px; color: var(--dim);
+    }
+    .notif-banner button {
+      background: rgba(255,0,85,0.12); border: 1px solid var(--p);
+      color: var(--p); font-family: var(--fm); font-size: 10px;
+      letter-spacing: 1px; padding: 4px 12px; cursor: pointer;
+      border-radius: 2px;
+    }
+
+    /* ── SESSION CARDS ── */
+    .sess-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .sess-card {
+      background: var(--s1); border: 1px solid var(--bc);
+      border-radius: 4px; padding: 12px 13px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .sess-card::before {
+      content: ''; position: absolute; top: 0; left: 0;
+      width: 100%; height: 2px; background: var(--c); opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .sess-card.active { border-color: var(--c); box-shadow: 0 0 16px rgba(0,243,255,0.12); }
+    .sess-card.active::before { opacity: 1; }
+    .sess-card.upcoming { border-color: rgba(255,0,85,0.3); }
+    .sess-card.upcoming::before { background: var(--p); opacity: 0.5; }
+
+    .sess-lbl { font-family: var(--fd); font-size: 8px; letter-spacing: 2px; color: var(--dim); margin-bottom: 3px; }
+    .sess-card.active .sess-lbl { color: var(--c); }
+    .sess-name { font-size: 13px; font-weight: 500; color: var(--txt); margin-bottom: 4px; }
+    .sess-time { font-size: 10px; color: var(--dim); margin-bottom: 7px; }
+    .sess-badge {
+      display: inline-block; font-size: 9px; letter-spacing: 1px;
+      padding: 2px 7px; border-radius: 2px;
+      background: rgba(0,243,255,0.1); color: var(--c);
+    }
+    .sess-card.upcoming .sess-badge { background: rgba(255,0,85,0.1); color: var(--p); }
+    .sess-card.offline  .sess-badge { background: rgba(255,255,255,0.04); color: var(--dim); }
+    .sess-cd { font-family: var(--fd); font-size: 12px; color: var(--c); margin-top: 5px; }
+
+    /* ── SYNC RING ── */
+    .ring-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 8px 0 4px;
+    }
+    .ring-box {
+      width: 200px; height: 200px;
+      display: grid; place-items: center; position: relative;
+    }
+    .ring-svg {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      transform: rotate(-90deg);
+      filter: drop-shadow(0 0 6px var(--c));
+    }
+    .ring-track { fill: none; stroke: rgba(0,243,255,0.07); stroke-width: 8; }
+    .ring-prog {
+      fill: none; stroke: url(#rg); stroke-width: 8; stroke-linecap: round;
+      stroke-dasharray: 565.49; stroke-dashoffset: 565.49;
+      transition: stroke-dashoffset 0.9s ease;
+    }
+    .ring-inner {
+      position: relative; z-index: 1; display: flex; flex-direction: column;
+      align-items: center; text-align: center; gap: 3px;
+    }
+    .ring-lbl {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 9px; letter-spacing: 3px; color: var(--dim);
+    }
+    .ring-pct {
+      font-family: var(--fd); font-size: 38px; font-weight: 900;
+      color: var(--c); text-shadow: var(--gC); line-height: 1;
+      animation: pctGlitch 7s infinite;
+    }
+    @keyframes pctGlitch {
+      0%,94%,100% { transform:translate(0); color: var(--c); }
+      95% { transform:translate(3px,-1px); color: var(--p); }
+      96% { transform:translate(-2px, 1px); }
+      97% { transform:translate(0); color: var(--c); }
+    }
+    .ring-sub { font-size: 10px; letter-spacing: 2px; color: var(--dim); }
+
+    /* ── METRICS ── */
+    .metrics-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .metric-box {
+      background: var(--s1); border: 1px solid var(--bc);
+      border-radius: 4px; padding: 12px;
+    }
+    .metric-lbl { font-size: 9px; letter-spacing: 2px; color: var(--dim); margin-bottom: 5px; }
+    .metric-val { font-family: var(--fd); font-size: 22px; font-weight: 700; color: var(--c); }
+    .metric-val.pink { color: var(--p); text-shadow: var(--gP); }
+    .bar-bg {
+      width: 100%; height: 3px; background: rgba(255,255,255,0.05);
+      border-radius: 2px; margin-top: 8px; overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%; border-radius: 2px;
+      background: var(--c); box-shadow: var(--gC);
+      transition: width 0.5s ease; width: 0%;
+    }
+    .bar-fill.pink { background: var(--p); box-shadow: var(--gP); }
+
+    /* ── RANK CARD ── */
+    .rank-card {
+      background: var(--s1); border: 1px solid var(--bc);
+      border-radius: 4px; padding: 15px 16px;
+      position: relative; overflow: hidden;
+    }
+    .rank-card::after {
+      content: ''; position: absolute; bottom: 0; right: 0;
+      width: 90px; height: 90px;
+      background: radial-gradient(circle at bottom right, rgba(255,0,85,0.08), transparent 70%);
+      pointer-events: none;
+    }
+    .rank-hdr {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+    }
+    .rank-lbl {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 9px; letter-spacing: 2px; color: var(--dim);
+    }
+    .rank-xp { font-size: 11px; color: var(--p); letter-spacing: 1px; }
+    .rank-name {
+      font-family: var(--fd); font-size: 18px; font-weight: 700;
+      color: var(--p); text-shadow: var(--gP); letter-spacing: 2px; margin-bottom: 3px;
+    }
+    .rank-next { font-size: 10px; color: var(--dim); margin-bottom: 10px; }
+    .xp-bg {
+      width: 100%; height: 6px; background: rgba(255,255,255,0.05);
+      border-radius: 3px; overflow: hidden;
+    }
+    .xp-fill {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, var(--p), var(--c));
+      box-shadow: 0 0 10px var(--p); transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1);
+      position: relative;
+    }
+    .xp-fill::after {
+      content: ''; position: absolute; right: 0; top: 0;
+      width: 4px; height: 100%; background: #fff; border-radius: 3px;
+      box-shadow: 0 0 8px #fff; animation: xpPulse 1.5s ease-in-out infinite;
+    }
+    @keyframes xpPulse { 50% { opacity: 0.3; } }
+
+    /* ── BOUNTY BOARD ── */
+    .section-hdr {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-title { font-family: var(--fd); font-size: 10px; letter-spacing: 3px; color: var(--c); }
+    .section-line { flex: 1; height: 1px; background: var(--bc); }
+
+    .bounty-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .bounty-item {
+      background: var(--s1); border: 1px solid var(--bc);
+      border-radius: 4px; padding: 9px 11px;
+      display: flex; align-items: center; gap: 8px;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .bounty-item.claimed { border-color: var(--c); background: rgba(0,243,255,0.04); }
+    .b-icon { flex-shrink: 0; display: flex; align-items: center; }
+    .b-text { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+    .b-name { font-size: 11px; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .b-req  { font-size: 9px; color: var(--dim); letter-spacing: 0.5px; }
+    .b-check {
+      width: 16px; height: 16px; border: 1px solid var(--bc);
+      border-radius: 2px; display: flex; align-items: center;
+      justify-content: center; font-size: 10px; flex-shrink: 0;
+    }
+    .bounty-item.claimed .b-check { border-color: var(--c); color: var(--c); box-shadow: var(--gC); }
+
+    /* ── BUTTONS ── */
+    .btn-main {
+      width: 100%; padding: 17px 16px;
+      background: transparent; border: 1px solid var(--c);
+      border-radius: 4px; color: var(--c); font-family: var(--fd);
+      font-size: 13px; font-weight: 700; letter-spacing: 3px;
+      cursor: pointer; position: relative; overflow: hidden;
+      transition: all 0.3s;
+      box-shadow: inset 0 0 20px rgba(0,243,255,0.04), 0 0 16px rgba(0,243,255,0.08);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .btn-main::before {
+      content: ''; position: absolute; top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(0,243,255,0.12), transparent);
+      transition: left 0.4s;
+    }
+    .btn-main:hover::before { left: 100%; }
+    .btn-main:hover {
+      background: rgba(0,243,255,0.06);
+      box-shadow: inset 0 0 30px rgba(0,243,255,0.08), 0 0 28px rgba(0,243,255,0.25);
+    }
+    .btn-main.active {
+      border-color: var(--p); color: var(--p);
+      box-shadow: inset 0 0 20px rgba(255,0,85,0.05), 0 0 16px rgba(255,0,85,0.18);
+    }
+    .btn-main.active:hover {
+      box-shadow: inset 0 0 30px rgba(255,0,85,0.08), 0 0 28px rgba(255,0,85,0.35);
+    }
+
+    .btn-secondary {
+      width: 100%; padding: 12px 16px;
+      background: transparent; border: 1px solid var(--bc);
+      border-radius: 4px; color: var(--dim); font-family: var(--fm);
+      font-size: 12px; letter-spacing: 2px; cursor: pointer;
+      transition: all 0.3s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-secondary:hover { border-color: var(--c); color: var(--c); }
+    .btn-secondary.on { border-color: var(--c); color: var(--c); text-shadow: var(--gC); }
+
+    /* ── INTEL ZONE ── */
+    #intel-zone {
+      display: none; flex-direction: column; gap: 8px;
+    }
+
+    .btn-intel {
+      width: 100%; padding: 13px 16px;
+      background: rgba(0,243,255,0.04); border: 1px solid rgba(0,243,255,0.35);
+      border-radius: 4px; color: var(--c); font-family: var(--fd);
+      font-size: 11px; font-weight: 700; letter-spacing: 3px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: all 0.3s;
+    }
+    .btn-intel:hover {
+      background: rgba(0,243,255,0.08);
+      box-shadow: 0 0 20px rgba(0,243,255,0.2);
+    }
+
+    /* Intel active row: countdown + restore */
+    #intel-active-row {
+      display: none; align-items: center; gap: 10px;
+    }
+    .intel-timer-box {
+      flex: 1; padding: 12px; border: 1px solid rgba(255,165,0,0.4);
+      border-radius: 4px; background: rgba(255,165,0,0.04);
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .intel-timer-lbl { font-size: 9px; letter-spacing: 2px; color: rgba(255,165,0,0.7); }
+    #intel-countdown {
+      font-family: var(--fd); font-size: 22px; font-weight: 700;
+      color: #ffa500; text-shadow: 0 0 10px rgba(255,165,0,0.5);
+      transition: color 0.3s;
+    }
+    .btn-restore {
+      padding: 12px 16px;
+      background: rgba(0,243,255,0.06); border: 1px solid var(--c);
+      border-radius: 4px; color: var(--c); font-family: var(--fd);
+      font-size: 10px; letter-spacing: 2px; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      transition: all 0.3s; white-space: nowrap;
+    }
+    .btn-restore:hover { background: rgba(0,243,255,0.12); box-shadow: 0 0 16px rgba(0,243,255,0.3); }
+
+    /* ── TERMINAL ── */
+    .terminal {
+      background: var(--s1); border: 1px solid var(--bc);
+      border-radius: 4px; overflow: hidden;
+    }
+    .term-hdr {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 12px; background: rgba(0,243,255,0.04);
+      border-bottom: 1px solid var(--bc);
+    }
+    .tdot { width: 8px; height: 8px; border-radius: 50%; }
+    .tdot:nth-child(1) { background: #ff5f57; }
+    .tdot:nth-child(2) { background: #febc2e; }
+    .tdot:nth-child(3) { background: #28c840; }
+    .term-title { font-size: 9px; letter-spacing: 2px; color: var(--dim); margin-left: 6px; }
+    #term-body {
+      padding: 12px; height: 155px; overflow-y: auto;
+      font-family: 'Roboto Mono', monospace; font-size: 13px; line-height: 1.65;
+      scrollbar-width: thin; scrollbar-color: var(--c) transparent;
+    }
+    #term-body::-webkit-scrollbar { width: 3px; }
+    #term-body::-webkit-scrollbar-thumb { background: var(--c); border-radius: 2px; }
+    .log-row { display: flex; gap: 8px; animation: fadeUp 0.25s ease; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(4px); } }
+    .log-t   { color: var(--dim); flex-shrink: 0; }
+    .log-m   { color: var(--txt); }
+    .log-m.cyan { color: var(--c); }
+    .log-m.pink { color: var(--p); }
+    .log-m.warn { color: #ffcc00; }
+
+    /* ── BREACH OVERLAY ── */
+    #breach-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(255,0,85,0.06);
+      border: 2px solid rgba(255,0,85,0.5);
+      pointer-events: none;
+    }
+    .breach-box {
+      background: var(--s2); border: 1px solid var(--p);
+      padding: 24px 32px; text-align: center;
+      box-shadow: 0 0 40px rgba(255,0,85,0.4);
+    }
+    .breach-title {
+      font-family: var(--fd); font-size: 18px; letter-spacing: 3px;
+      color: var(--p); text-shadow: var(--gP); margin-bottom: 8px;
+    }
+    .breach-sub { font-size: 12px; color: var(--dim); letter-spacing: 1px; }
+    .breach-alarm {
+      animation: breachFlicker 0.4s infinite;
+    }
+    @keyframes breachFlicker { 50% { background: rgba(255,0,85,0.12); border-color: var(--p); } }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 22px; left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: var(--s2); border: 1px solid var(--c);
+      color: var(--c); font-size: 11px; letter-spacing: 2px;
+      padding: 9px 20px; border-radius: 2px;
+      box-shadow: 0 0 20px rgba(0,243,255,0.25);
+      opacity: 0; transition: all 0.3s; z-index: 9997;
+      white-space: nowrap; pointer-events: none;
+    }
+    .toast-show { opacity: 1 !important; transform: translateX(-50%) translateY(0) !important; }
+    .toast-pink { border-color: var(--p) !important; color: var(--p) !important; box-shadow: 0 0 20px rgba(255,0,85,0.25) !important; }
+
+    /* ── FOOTER ── */
+    .footer {
+      text-align: center; font-size: 9px; letter-spacing: 2px;
+      color: var(--dim); padding-top: 4px;
+      border-top: 1px solid var(--bc);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BREACH OVERLAY -->
+  <div id="breach-overlay">
+    <div class="breach-box">
+      <div class="breach-title">⚠ CRITICAL BREACH</div>
+      <div class="breach-sub">COMM-LINK SEVERED — SYNC DEGRADING</div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast"></div>
+
+  <div id="app">
+
+    <!-- HEADER -->
+    <div class="hdr">
+      <div class="hdr-tag">▸ SYSTEM ONLINE ◂</div>
+      <div class="logo">NEURAL LINK</div>
+      <div class="tagline">// TRADER FOCUS TERMINAL //</div>
+      <div class="hdr-line"></div>
+    </div>
+
+    <!-- STATUS STRIP -->
+    <div class="status-strip">
+      <div class="status-left">
+        <div class="dot" id="uplink-dot"></div>
+        <span id="uplink-status">UPLINK INACTIVE</span>
+      </div>
+      <span id="clock">--:--:--</span>
+    </div>
+
+    <!-- NOTIFICATION BANNER -->
+    <div class="notif-banner" id="notif-banner">
+      <span>Enable alerts for session warnings</span>
+      <button onclick="requestNotifPermission()">ENABLE</button>
+    </div>
+
+    <!-- SESSION CARDS -->
+    <div class="sess-row">
+      <div class="sess-card offline" id="card-london">
+        <div class="sess-lbl">SESSION_01</div>
+        <div class="sess-name">LONDON</div>
+        <div class="sess-time">12:30 – 14:30 IST</div>
+        <div class="sess-badge" id="badge-london">OFFLINE</div>
+        <div class="sess-cd" id="cd-london"></div>
+      </div>
+      <div class="sess-card offline" id="card-ny">
+        <div class="sess-lbl">SESSION_02</div>
+        <div class="sess-name">NEW YORK</div>
+        <div class="sess-time">17:30 – 20:00 IST</div>
+        <div class="sess-badge" id="badge-ny">OFFLINE</div>
+        <div class="sess-cd" id="cd-ny"></div>
+      </div>
+    </div>
+
+    <!-- SYNC RING -->
+    <div class="ring-wrap">
+      <div class="ring-box">
+        <svg class="ring-svg" viewBox="0 0 200 200">
+          <defs>
+            <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#ff0055"/>
+              <stop offset="100%" stop-color="#00f3ff"/>
+            </linearGradient>
+          </defs>
+          <circle class="ring-track" cx="100" cy="100" r="90"/>
+          <circle class="ring-prog" id="ring-progress" cx="100" cy="100" r="90"/>
+        </svg>
+        <div class="ring-inner">
+          <div class="ring-lbl">
+            <!-- pulse SVG injected by JS -->
+            <span id="ring-pulse-slot"></span>
+            SYNC
+          </div>
+          <div class="ring-pct" id="sync-rate">0%</div>
+          <div class="ring-sub" id="session-timer">--:--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- METRICS -->
+    <div class="metrics-row">
+      <div class="metric-box">
+        <div class="metric-lbl">FOCUS MINUTES</div>
+        <div class="metric-val" id="focus-mins-val">0</div>
+        <div class="bar-bg"><div class="bar-fill" id="focus-bar"></div></div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-lbl">DRIFT EVENTS</div>
+        <div class="metric-val pink" id="drift-val">0</div>
+        <div class="bar-bg"><div class="bar-fill pink" id="drift-bar"></div></div>
+      </div>
+    </div>
+
+    <!-- RANK CARD -->
+    <div class="rank-card">
+      <div class="rank-hdr">
+        <div class="rank-lbl" id="rank-lbl-el">
+          <!-- chevron SVG injected by JS -->
+          BOUNTY RANK
+        </div>
+        <div class="rank-xp" id="xp-val">0 XP</div>
+      </div>
+      <div class="rank-name" id="rank-name">GLITCH-RUNNER</div>
+      <div class="rank-next" id="rank-next">Next: CIPHER-GHOST @ 60 XP</div>
+      <div class="xp-bg"><div class="xp-fill" id="xp-bar" style="width:0%"></div></div>
+    </div>
+
+    <!-- BOUNTY BOARD -->
+    <div class="section-hdr">
+      <div class="section-title">BOUNTY BOARD</div>
+      <div class="section-line"></div>
+    </div>
+    <!--
+      NOTE: bounty-grid is populated by renderBounties() in app.js
+      using the ICONS library (which contains the exact SVG paths below).
+      The SVG specs per final integration brief are embedded in ICONS.bolt,
+      ICONS.target, ICONS.shield in app.js. Rendered output matches:
+
+      FIRST SYNC icon:
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00f3ff" stroke-width="2">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+
+      NO DRIFT icon:
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff0055" stroke-width="2">
+        <path d="M8 5.8a2.8 2.8 0 00-3.4 3 3 3 0 004.4 3.5v.1c0 2 1.4 3.1 2.8 3.5
+                 1.5.4 2.2-.3 2.2-1.5 0-1.2-.5-2.2-2-3a3 3 0 01-1.5-2.8c0-1 .4-1.9 1-2.6z"/>
+      </svg>
+
+      FULL SESSION icon:
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00f3ff" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="6"/>
+        <circle cx="12" cy="12" r="2"/>
+      </svg>
+    -->
+    <div class="bounty-grid" id="bounty-grid">
+      <!-- Static fallback rows — visible before JS loads, replaced by renderBounties() -->
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24"
+               fill="none" stroke="#00f3ff" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="rgba(0,243,255,0.15)"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">First Sync</span>
+          <span class="b-req">1 min focused</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24"
+               fill="none" stroke="#00f3ff" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="6"/>
+            <circle cx="12" cy="12" r="2" fill="#00f3ff" stroke="none"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">Full Session</span>
+          <span class="b-req">60 mins in slot</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24"
+               fill="none" stroke="#ff0055" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 5.8a2.8 2.8 0 00-3.4 3 3 3 0 004.4 3.5v.1c0 2 1.4 3.1 2.8 3.5
+                     1.5.4 2.2-.3 2.2-1.5 0-1.2-.5-2.2-2-3a3 3 0 01-1.5-2.8c0-1 .4-1.9 1-2.6z"
+                  fill="rgba(255,0,85,0.1)"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">No Drift</span>
+          <span class="b-req">0 breaches</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3C8 3 5 6 5 10v10l2-2 2 2 2-2 2 2 2-2 2 2V10C19 6 16 3 12 3z"
+                  stroke="#00f3ff" stroke-width="1.5" fill="rgba(0,243,255,0.07)"/>
+            <circle cx="9.5" cy="10" r="1" fill="#00f3ff"/>
+            <circle cx="14.5" cy="10" r="1" fill="#00f3ff"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">Ghost Protocol</span>
+          <span class="b-req">30 mins clean</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon svg-pink" width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <rect x="2"  y="3"  width="9" height="7" rx="1" stroke="#ff0055" stroke-width="1.5" fill="none"/>
+            <rect x="13" y="3"  width="9" height="7" rx="1" stroke="#ff0055" stroke-width="1.5" fill="none"/>
+            <rect x="2"  y="14" width="9" height="7" rx="1" stroke="#ff0055" stroke-width="1.5" fill="none"/>
+            <rect x="13" y="14" width="9" height="7" rx="1" stroke="#00f3ff" stroke-width="1.5" fill="none"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">Double Session</span>
+          <span class="b-req">Both sessions</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+      <div class="bounty-item">
+        <span class="b-icon">
+          <svg class="svg-icon svg-pink" width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 4C8.5 4 6 6.5 6 10c0 2.5 1.5 4.5 3.5 5.5V18h5v-2.5C16.5 14.5 18 12.5 18 10c0-3.5-2.5-6-6-6z"
+                  stroke="#ff0055" stroke-width="1.5" fill="rgba(255,0,85,0.07)"/>
+            <rect x="9" y="18" width="6" height="2" rx="0.5" stroke="#ff0055" stroke-width="1" fill="none"/>
+            <circle cx="9.5"  cy="10" r="1.5" fill="#ff0055"/>
+            <circle cx="14.5" cy="10" r="1.5" fill="#ff0055"/>
+          </svg>
+        </span>
+        <span class="b-text">
+          <span class="b-name">Iron Trader</span>
+          <span class="b-req">3 day streak</span>
+        </span>
+        <span class="b-check"></span>
+      </div>
+    </div>
+
+    <!-- MAIN UPLINK BUTTON -->
+    <button class="btn-main" id="btn-uplink" onclick="toggleUplink()">
+      <!-- SVG + label injected by JS -->
+      START UPLINK
+    </button>
+
+    <!-- EXTERIOR INTEL ZONE (only visible when uplink active) -->
+    <div id="intel-zone">
+      <!-- Primary intel button -->
+      <button class="btn-intel" id="btn-intel" onclick="activateTactical()">
+        EXTERIOR INTEL — OPEN COMM-LINK
+      </button>
+      <!-- tactical-btn: explicit ID per spec, same action -->
+      <button class="btn-intel" id="tactical-btn" onclick="activateTactical()">
+        EXTERIOR INTEL
+      </button>
+      <!-- Active countdown row: shown during tactical window -->
+      <div id="intel-active-row">
+        <div class="intel-timer-box">
+          <div class="intel-timer-lbl">WINDOW CLOSING</div>
+          <div id="intel-countdown">03:00</div>
+        </div>
+        <button class="btn-restore" onclick="restoreLink()">
+          RESTORE LINK
+        </button>
+      </div>
+    </div>
+
+    <!-- AMBIENCE BUTTON -->
+    <button class="btn-secondary" id="btn-audio" onclick="toggleAudio()">
+      <!-- radar SVG injected by JS -->
+      AMBIENCE: OFF
+    </button>
+
+    <!-- TERMINAL -->
+    <div class="section-hdr">
+      <div class="section-title">TERMINAL READOUT</div>
+      <div class="section-line"></div>
+    </div>
+    <div class="terminal">
+      <div class="term-hdr">
+        <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
+        <div class="term-title">NEURAL_LINK v1.0 // SESSION_LOG</div>
+      </div>
+      <div id="term-body">
+        <div class="log-row">
+          <span class="log-t">--:--:--</span>
+          <span class="log-m cyan">▸ SYSTEM BOOT COMPLETE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">NEURAL LINK v1.0 // FARMAN J · AI GENERALIST</div>
+
+  </div><!-- #app -->
+
+  <script src="app.js"></script>
+
+  <script>
+    // Inject SVG icons into static HTML elements after app.js loads
+    document.addEventListener('DOMContentLoaded', () => {
+      // Ring pulse icon
+      const rps = document.getElementById('ring-pulse-slot');
+      if (rps && typeof ICONS !== 'undefined') rps.innerHTML = ICONS.pulse;
+
+      // Rank chevron
+      const rl = document.getElementById('rank-lbl-el');
+      if (rl && typeof ICONS !== 'undefined') rl.innerHTML = ICONS.chevron + ' BOUNTY RANK';
+
+      // Uplink button
+      const bu = document.getElementById('btn-uplink');
+      if (bu && typeof ICONS !== 'undefined') bu.innerHTML = ICONS.power + '<span>START UPLINK</span>';
+
+      // Intel button
+      const bi = document.getElementById('btn-intel');
+      if (bi && typeof ICONS !== 'undefined') bi.innerHTML = ICONS.crosshair + '<span>EXTERIOR INTEL — OPEN COMM-LINK</span>';
+
+      // Restore button
+      const br = document.querySelector('.btn-restore');
+      if (br && typeof ICONS !== 'undefined') br.innerHTML = ICONS.restore + '<span>RESTORE LINK</span>';
+
+      // Audio button
+      const ba = document.getElementById('btn-audio');
+      if (ba && typeof ICONS !== 'undefined') ba.innerHTML = ICONS.radar + '<span>AMBIENCE: OFF</span>';
+    });
+  </script>
+
+</body>
+</html>
