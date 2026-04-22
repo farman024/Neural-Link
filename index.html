@@ -717,11 +717,7 @@
 
     <!-- EXTERIOR INTEL ZONE (only visible when uplink active) -->
     <div id="intel-zone">
-      <!-- Primary intel button -->
-      <button class="btn-intel" id="btn-intel" onclick="activateTactical()">
-        EXTERIOR INTEL — OPEN COMM-LINK
-      </button>
-      <!-- tactical-btn: explicit ID per spec, same action -->
+      <!-- Single tactical button — crosshair SVG injected by boot script -->
       <button class="btn-intel" id="tactical-btn" onclick="activateTactical()">
         EXTERIOR INTEL
       </button>
@@ -769,31 +765,32 @@
   <script src="app.js"></script>
 
   <script>
-    // Inject SVG icons into static HTML elements after app.js loads
     document.addEventListener('DOMContentLoaded', () => {
+      if (typeof ICONS === 'undefined') return;
+
       // Ring pulse icon
       const rps = document.getElementById('ring-pulse-slot');
-      if (rps && typeof ICONS !== 'undefined') rps.innerHTML = ICONS.pulse;
+      if (rps) rps.innerHTML = ICONS.pulse;
 
       // Rank chevron
       const rl = document.getElementById('rank-lbl-el');
-      if (rl && typeof ICONS !== 'undefined') rl.innerHTML = ICONS.chevron + ' BOUNTY RANK';
+      if (rl) rl.innerHTML = ICONS.chevron + ' BOUNTY RANK';
 
       // Uplink button
       const bu = document.getElementById('btn-uplink');
-      if (bu && typeof ICONS !== 'undefined') bu.innerHTML = ICONS.power + '<span>START UPLINK</span>';
+      if (bu) bu.innerHTML = ICONS.power + '<span>START UPLINK</span>';
 
-      // Intel button
-      const bi = document.getElementById('btn-intel');
-      if (bi && typeof ICONS !== 'undefined') bi.innerHTML = ICONS.crosshair + '<span>EXTERIOR INTEL — OPEN COMM-LINK</span>';
+      // Tactical button (crosshair SVG)
+      const bt = document.getElementById('tactical-btn');
+      if (bt) bt.innerHTML = ICONS.crosshair + '<span>EXTERIOR INTEL</span>';
 
       // Restore button
       const br = document.querySelector('.btn-restore');
-      if (br && typeof ICONS !== 'undefined') br.innerHTML = ICONS.restore + '<span>RESTORE LINK</span>';
+      if (br) br.innerHTML = ICONS.restore + '<span>RESTORE LINK</span>';
 
       // Audio button
       const ba = document.getElementById('btn-audio');
-      if (ba && typeof ICONS !== 'undefined') ba.innerHTML = ICONS.radar + '<span>AMBIENCE: OFF</span>';
+      if (ba) ba.innerHTML = ICONS.radar + '<span>AMBIENCE: OFF</span>';
     });
   </script>
 

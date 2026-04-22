@@ -1,9 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-// NEURAL LINK — app.js  |  Final Integration
+// NEURAL LINK — app.js  |  System Overhaul
 // ═══════════════════════════════════════════════════════════════
 
 // ── SVG ICON LIBRARY ────────────────────────────────────────────
-// All raw SVG. CSS class .svg-icon applies drop-shadow glow.
 const ICONS = {
 
   power: `<svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -53,15 +52,12 @@ const ICONS = {
       stroke="#00f3ff" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
   </svg>`,
 
-  // ── BOUNTY ICONS — exact paths per final spec ──────────────────
-  // First Sync: lightning bolt
   bolt: `<svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24"
       fill="none" stroke="#00f3ff" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="rgba(0,243,255,0.15)"/>
   </svg>`,
 
-  // Full Session: concentric target circles
   target: `<svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24"
       fill="none" stroke="#00f3ff" stroke-width="2">
     <circle cx="12" cy="12" r="10"/>
@@ -69,7 +65,6 @@ const ICONS = {
     <circle cx="12" cy="12" r="2" fill="#00f3ff" stroke="none"/>
   </svg>`,
 
-  // No Drift: fire/flame path
   shield: `<svg class="svg-icon svg-pink" width="20" height="20" viewBox="0 0 24 24"
       fill="none" stroke="#ff0055" stroke-width="2"
       stroke-linecap="round" stroke-linejoin="round">
@@ -78,7 +73,6 @@ const ICONS = {
       fill="rgba(255,0,85,0.1)"/>
   </svg>`,
 
-  // Ghost Protocol: ghost silhouette
   ghost: `<svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
     <path d="M12 3C8 3 5 6 5 10v10l2-2 2 2 2-2 2 2 2-2 2 2V10C19 6 16 3 12 3z"
       stroke="#00f3ff" stroke-width="1.5" fill="rgba(0,243,255,0.07)"/>
@@ -86,7 +80,6 @@ const ICONS = {
     <circle cx="14.5" cy="10" r="1" fill="#00f3ff"/>
   </svg>`,
 
-  // Double Session: quad grid
   dual: `<svg class="svg-icon svg-pink" width="20" height="20" viewBox="0 0 24 24" fill="none">
     <rect x="2"  y="3"  width="9" height="7" rx="1" stroke="#ff0055" stroke-width="1.5" fill="none"/>
     <rect x="13" y="3"  width="9" height="7" rx="1" stroke="#ff0055" stroke-width="1.5" fill="none"/>
@@ -94,7 +87,6 @@ const ICONS = {
     <rect x="13" y="14" width="9" height="7" rx="1" stroke="#00f3ff" stroke-width="1.5" fill="none"/>
   </svg>`,
 
-  // Iron Trader: skull
   skull: `<svg class="svg-icon svg-pink" width="20" height="20" viewBox="0 0 24 24" fill="none">
     <path d="M12 4C8.5 4 6 6.5 6 10c0 2.5 1.5 4.5 3.5 5.5V18h5v-2.5C16.5 14.5 18 12.5 18 10c0-3.5-2.5-6-6-6z"
       stroke="#ff0055" stroke-width="1.5" fill="rgba(255,0,85,0.07)"/>
@@ -133,31 +125,31 @@ const BOUNTIES = [
 
 // ── STATE ──────────────────────────────────────────────────────
 const S = {
-  uplinkActive:     false,
+  uplinkActive:        false,
 
-  // ── Sync Engine ──
-  focusSeconds:     0,   // ticks up every second: uplink ON + NOT hidden/breach
-  driftSeconds:     0,   // ticks up in visibility listener: hidden + isTacticalMode FALSE
+  // Sync counters
+  focusSeconds:        0,
+  driftSeconds:        0,
 
-  // ── Tactical / Intel ──
-  isTacticalMode:   false,  // TRUE = drift penalty suspended
+  // Tactical mode
+  isTacticalMode:      false,
   tacticalSecondsLeft: 0,
 
-  // ── Gamification ──
-  ghostSeconds:     0,   // continuous clean seconds; resets on drift event
-  driftCount:       0,   // total breach events this uplink session
-  inBreach:         false,
+  // Gamification
+  ghostSeconds:        0,
+  driftCount:          0,
+  inBreach:            false,
 
-  // ── Session tracking ──
-  sessionsCompleted: [],
-  announced:        {},
+  // Session
+  sessionsCompleted:   [],
+  announced:           {},
 
-  // ── Persisted ──
-  xp:               0,
-  focusMinutes:     0,
-  claimedBounties:  [],
-  streak:           0,
-  lastTradeDate:    null,
+  // Persisted
+  xp:                  0,
+  focusMinutes:        0,
+  claimedBounties:     [],
+  streak:              0,
+  lastTradeDate:       null,
 };
 
 // ── PERSIST ────────────────────────────────────────────────────
@@ -182,10 +174,37 @@ function load() {
   } catch (_) {}
 }
 
-// ── GLOBAL HANDLES (window-scoped so GC can't touch them) ──────
-window._NL_TICK    = null;   // master 1s tick
-window._NL_TACTICAL = null;  // tactical countdown interval
-window._NL_DRIFT   = null;   // drift-second accumulator interval
+// ── GLOBAL INTERVAL HANDLES (window-scoped, immune to GC) ──────
+window._NL_TICK     = null;   // 1s master tick
+window._NL_TACTICAL = null;   // tactical countdown
+window._NL_DRIFT    = null;   // drift accumulator (explicit tab-switch only)
+
+// ── WAKE LOCK ──────────────────────────────────────────────────
+// Prevents screen from dimming while uplink is active.
+// Pocket/screen-off is handled by the OS and does NOT count as drift.
+let _wakeLock = null;
+
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    _wakeLock = await navigator.wakeLock.request('screen');
+    log('WakeLock acquired. Screen will stay active.', 'cyan');
+    // Re-acquire if released by OS (e.g. after screen unlock)
+    _wakeLock.addEventListener('release', () => {
+      log('WakeLock released by OS. Re-acquiring...', 'warn');
+      if (S.uplinkActive) acquireWakeLock();
+    });
+  } catch (e) {
+    log('WakeLock unavailable: ' + e.message, 'warn');
+  }
+}
+
+async function releaseWakeLock() {
+  if (_wakeLock) {
+    try { await _wakeLock.release(); } catch (_) {}
+    _wakeLock = null;
+  }
+}
 
 // ── IST HELPERS ────────────────────────────────────────────────
 function getIST() {
@@ -258,17 +277,14 @@ function buildAmbience() {
   };
   const gain = v => { const g = _ctx.createGain(); g.gain.value = v; return g; };
 
-  // Bass sine + LFO
-  const bass  = osc('sine', 48);     const bassG  = gain(0.28);
-  const lfo   = osc('sine', 0.25);   const lfoG   = gain(5);
+  const bass  = osc('sine', 48);      const bassG  = gain(0.28);
+  const lfo   = osc('sine', 0.25);    const lfoG   = gain(5);
   lfo.connect(lfoG); lfoG.connect(bass.frequency);
   bass.connect(bassG); bassG.connect(_master);
 
-  // Sawtooth mid drone
   const drone  = osc('sawtooth', 80, 8); const droneG = gain(0.035);
   drone.connect(droneG); droneG.connect(_master);
 
-  // Rain: filtered white noise
   const buf   = _ctx.createBuffer(1, _ctx.sampleRate * 2, _ctx.sampleRate);
   const data  = buf.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -288,7 +304,6 @@ function killAmbience() {
   _ambiNodes = [];
 }
 
-// Descending 3-tone breach alarm
 function playBreachAlarm() {
   initCtx();
   if (_ctx.state === 'suspended') _ctx.resume();
@@ -325,16 +340,12 @@ function toggleAudio() {
   }
 }
 
-// ── SPEECH — ROBOTIC FEMALE VOICE ─────────────────────────────
-// speak()        → default (any English, lower pitch)
-// speakTactical()→ prefers a female voice for tactical announcements
+// ── SPEECH ─────────────────────────────────────────────────────
 function speak(text, rate = 0.85, pitch = 0.65) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const u      = new SpeechSynthesisUtterance(text);
-  u.rate   = rate;
-  u.pitch  = pitch;
-  u.volume = 0.95;
+  u.rate = rate; u.pitch = pitch; u.volume = 0.95;
   const voices = window.speechSynthesis.getVoices();
   const v = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('uk'))
          || voices.find(v => v.lang.startsWith('en'))
@@ -343,22 +354,18 @@ function speak(text, rate = 0.85, pitch = 0.65) {
   window.speechSynthesis.speak(u);
 }
 
+// Robotic female voice — used exclusively for tactical alerts
 function speakTactical(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const u      = new SpeechSynthesisUtterance(text);
-  u.rate   = 0.82;
-  u.pitch  = 1.1;   // higher pitch = more feminine/robotic
-  u.volume = 0.95;
-
-  // Priority: female English voice → any English → first available
+  u.rate = 0.82; u.pitch = 1.1; u.volume = 0.95;
   const voices  = window.speechSynthesis.getVoices();
   const femaleV = voices.find(v =>
     v.lang.startsWith('en') &&
     /female|samantha|victoria|karen|moira|tessa|fiona|zira|hazel|susan|eva|allison|ava/i.test(v.name)
   );
-  const anyEn   = voices.find(v => v.lang.startsWith('en'));
-  u.voice = femaleV || anyEn || voices[0] || null;
+  u.voice = femaleV || voices.find(v => v.lang.startsWith('en')) || voices[0] || null;
   window.speechSynthesis.speak(u);
 }
 
@@ -417,8 +424,7 @@ function toast(msg, pink = false) {
 // ── RING ───────────────────────────────────────────────────────
 function setRing(pct) {
   const v      = Math.min(Math.max(pct, 0), 100);
-  const circ   = 2 * Math.PI * 90;          // 565.49
-  const offset = circ * (1 - v / 100);
+  const offset = (2 * Math.PI * 90) * (1 - v / 100);
   const prog   = document.getElementById('ring-progress');
   const label  = document.getElementById('sync-rate');
   if (prog)  prog.style.strokeDashoffset = offset;
@@ -433,7 +439,6 @@ function refreshCards() {
     const badge = document.getElementById('badge-' + key);
     const cd    = document.getElementById('cd-' + key);
     if (!card) return;
-
     card.className    = 'sess-card ' + info.status;
     badge.textContent =
       info.status === 'active'   ? 'LIVE'
@@ -449,14 +454,14 @@ function refreshCards() {
 // ── METRICS ────────────────────────────────────────────────────
 function refreshMetrics() {
   const mins = Math.floor(S.focusSeconds / 60);
-  const fm = document.getElementById('focus-mins-val');
-  const dc = document.getElementById('drift-val');
-  const fb = document.getElementById('focus-bar');
-  const db = document.getElementById('drift-bar');
-  if (fm) fm.textContent  = mins;
-  if (dc) dc.textContent  = S.driftCount;
-  if (fb) fb.style.width  = Math.min((mins / 150) * 100, 100) + '%';
-  if (db) db.style.width  = Math.min((S.driftCount / 20) * 100, 100) + '%';
+  const fm   = document.getElementById('focus-mins-val');
+  const dc   = document.getElementById('drift-val');
+  const fb   = document.getElementById('focus-bar');
+  const db   = document.getElementById('drift-bar');
+  if (fm) fm.textContent = mins;
+  if (dc) dc.textContent = S.driftCount;
+  if (fb) fb.style.width = Math.min((mins / 150) * 100, 100) + '%';
+  if (db) db.style.width = Math.min((S.driftCount / 20) * 100, 100) + '%';
 }
 
 // ── RANK ───────────────────────────────────────────────────────
@@ -483,11 +488,11 @@ function checkBounties() {
   BOUNTIES.forEach(b => {
     if (S.claimedBounties.includes(b.id)) return;
     let ok = false;
-    if (!b.special               && S.focusSeconds  >= b.xpReq) ok = true;
-    if (b.special === 'nodrift'  && S.driftCount    === 0 && S.focusSeconds >= 600) ok = true;
-    if (b.special === 'ghost30'  && S.ghostSeconds  >= 1800) ok = true;
-    if (b.special === 'double'   && S.sessionsCompleted.length >= 2) ok = true;
-    if (b.special === 'streak3'  && S.streak        >= 3) ok = true;
+    if (!b.special              && S.focusSeconds >= b.xpReq)            ok = true;
+    if (b.special === 'nodrift' && S.driftCount === 0 && S.focusSeconds >= 600) ok = true;
+    if (b.special === 'ghost30' && S.ghostSeconds >= 1800)                ok = true;
+    if (b.special === 'double'  && S.sessionsCompleted.length >= 2)       ok = true;
+    if (b.special === 'streak3' && S.streak >= 3)                         ok = true;
     if (!ok) return;
 
     S.claimedBounties.push(b.id);
@@ -522,7 +527,6 @@ function renderBounties() {
 function checkAnnouncements(info, key) {
   if (info.status !== 'active') return;
   const s = SESSIONS[key];
-
   if (!S.announced[key + '_start']) {
     S.announced[key + '_start'] = true;
     speak(`${s.name} session live. Trade with precision.`);
@@ -544,24 +548,47 @@ function checkAnnouncements(info, key) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  SYNC ENGINE — MASTER TICK (fires every 1s)
+//  SYNC ENGINE — MASTER TICK  (fires every 1s via _NL_TICK)
 //
 //  FORMULA: syncRate = focusSeconds / (focusSeconds + driftSeconds) * 100
 //
-//  focusSeconds  → increments here every tick when uplink active
-//                  and document is NOT hidden
-//  driftSeconds  → increments in the Visibility API listener
-//                  ONLY when: document.hidden AND !isTacticalMode
+//  focusSeconds: increments here — only when document is VISIBLE
+//  driftSeconds: increments in visibilitychange — only on EXPLICIT
+//                tab-switch, NOT screen-off / pocket / OS pause
 //
-//  Result: 0 drift = 100% sync. Drift degrades ratio proportionally.
+//  Date.now() CATCHUP: on every tick, compare against _lastTickAt.
+//  If the OS paused the browser (pocket mode), elapsed wall-clock
+//  time is detected on resume and focusSeconds catches up instantly
+//  without penalty, keeping sync accurate.
 // ═══════════════════════════════════════════════════════════════
+let _lastTickAt = null;  // Date.now() of the previous tick
+
 function masterTick() {
   if (!S.uplinkActive) return;
 
-  // Clock
+  const now = Date.now();
+
+  // ── Date.now() catchup ─────────────────────────────────────
+  // If the OS froze us (pocket mode, screen off), _lastTickAt will
+  // be stale. We detect the gap and credit focusSeconds for the
+  // missed time — since screen-off is NOT drift, just absence.
+  if (_lastTickAt !== null) {
+    const elapsed = Math.round((now - _lastTickAt) / 1000);
+    if (elapsed > 2) {
+      // More than 2s gap → we were suspended by the OS
+      // Credit missed focus time (screen was off, not tab-switched)
+      const catchup = elapsed - 1; // subtract the 1s we're about to add below
+      S.focusSeconds  += catchup;
+      S.ghostSeconds  += catchup;
+      log(`OS resume detected. Catchup: +${catchup}s focus credited.`, 'warn');
+    }
+  }
+  _lastTickAt = now;
+
+  // Clock display
   document.getElementById('clock').textContent = hhmmss(getIST());
 
-  // ── focusSeconds: only when app is visible ──────────────────
+  // ── Increment focusSeconds (visible time only) ──────────────
   if (!document.hidden) {
     S.focusSeconds++;
     S.ghostSeconds++;
@@ -569,33 +596,29 @@ function masterTick() {
     // XP: 1 per focus minute, during a live session only
     const lI = getSessionInfo('london');
     const nI = getSessionInfo('ny');
-    const inSession = lI.status === 'active' || nI.status === 'active';
-    if (inSession && S.focusSeconds % 60 === 0) {
+    if ((lI.status === 'active' || nI.status === 'active') && S.focusSeconds % 60 === 0) {
       S.focusMinutes++;
       S.xp++;
       save();
       checkBounties();
       log(`Focus: ${S.focusMinutes}m | XP: ${S.xp}`, '');
     }
-
     checkAnnouncements(lI, 'london');
     checkAnnouncements(nI, 'ny');
   }
 
-  // ── Sync % ──────────────────────────────────────────────────
-  // focusSeconds / (focusSeconds + driftSeconds) * 100
-  // Edge case: if both 0 (very first tick), show 100%
+  // ── Sync rate ───────────────────────────────────────────────
   const total   = S.focusSeconds + S.driftSeconds;
   const syncPct = total === 0 ? 100 : (S.focusSeconds / total) * 100;
 
   // ── Timer label ─────────────────────────────────────────────
   const lI2 = getSessionInfo('london');
   const nI2 = getSessionInfo('ny');
-  const active = lI2.status === 'active' ? lI2
-               : nI2.status === 'active' ? nI2
-               : null;
-  const timerLabel = active
-    ? fmtMinsLabel(active.remaining * 60) + ' LEFT'
+  const activeSession = lI2.status === 'active' ? lI2
+                      : nI2.status === 'active' ? nI2
+                      : null;
+  const timerLabel = activeSession
+    ? fmtMinsLabel(activeSession.remaining * 60) + ' LEFT'
     : fmtSecs(S.focusSeconds) + ' UPLINK';
 
   setRing(syncPct);
@@ -614,22 +637,24 @@ function toggleUplink() {
 
   if (S.uplinkActive) {
     // Full state reset
-    S.focusSeconds      = 0;
-    S.driftSeconds      = 0;
-    S.ghostSeconds      = 0;
-    S.driftCount        = 0;
-    S.isTacticalMode    = false;
+    S.focusSeconds       = 0;
+    S.driftSeconds       = 0;
+    S.ghostSeconds       = 0;
+    S.driftCount         = 0;
+    S.isTacticalMode     = false;
     S.tacticalSecondsLeft = 0;
-    S.inBreach          = false;
-    S.sessionsCompleted = [];
-    S.announced         = {};
+    S.inBreach           = false;
+    S.sessionsCompleted  = [];
+    S.announced          = {};
+    _lastTickAt          = null;
 
-    clearInterval(window._NL_INTEL);
     clearInterval(window._NL_TACTICAL);
     clearInterval(window._NL_DRIFT);
-    window._NL_INTEL    = null;
     window._NL_TACTICAL = null;
     window._NL_DRIFT    = null;
+
+    // Acquire WakeLock to keep screen alive during trading
+    acquireWakeLock();
 
     // UI
     document.getElementById('btn-uplink').innerHTML = ICONS.terminate + '<span>TERMINATE UPLINK</span>';
@@ -639,17 +664,16 @@ function toggleUplink() {
     document.getElementById('intel-zone').style.display  = 'flex';
     setBreach(false);
 
-    log('Uplink initialized. Neural sync engaged.', 'cyan');
+    log('Uplink initialized. WakeLock armed. Neural sync engaged.', 'cyan');
     speak('Neural link established. Focus protocol active. Watch the charts.');
     toast('UPLINK ONLINE');
 
-    // Start master tick — fire immediately so ring shows 100% from second 0
+    // Fire tick immediately (shows 100% sync on first frame)
     clearInterval(window._NL_TICK);
     window._NL_TICK = setInterval(masterTick, 1000);
     masterTick();
 
   } else {
-    // Stop everything
     clearInterval(window._NL_TICK);
     clearInterval(window._NL_TACTICAL);
     clearInterval(window._NL_DRIFT);
@@ -659,6 +683,9 @@ function toggleUplink() {
 
     S.isTacticalMode = false;
     S.inBreach       = false;
+    _lastTickAt      = null;
+
+    releaseWakeLock();
 
     document.getElementById('btn-uplink').innerHTML = ICONS.power + '<span>START UPLINK</span>';
     document.getElementById('btn-uplink').classList.remove('active');
@@ -682,15 +709,9 @@ function toggleUplink() {
 // ═══════════════════════════════════════════════════════════════
 //  TACTICAL MODE — EXTERIOR INTEL
 //
-//  activateTactical() is the canonical function name per spec.
-//  startExteriorIntel() is kept as an alias for backward compat.
-//
-//  Behaviour:
-//    1. Sets isTacticalMode = true for 180 seconds
-//    2. While true: Visibility API does NOT increment driftSeconds
-//    3. Robotic female voice announces start
-//    4. On expiry: isTacticalMode = false, breach alarm, female voice
-//    5. RESTORE LINK button cancels early and resets cleanly
+//  activateTactical(): suspends drift penalties for 180 seconds.
+//  During this window, tab-hidden events are silently ignored.
+//  Female robotic voice for all tactical announcements.
 // ═══════════════════════════════════════════════════════════════
 const TACTICAL_SECS = 180;
 
@@ -702,36 +723,36 @@ function activateTactical() {
   S.inBreach            = false;
   setBreach(false);
 
-  // UI: hide buttons, show countdown row
-  document.getElementById('btn-intel').style.display       = 'none';
-  document.getElementById('tactical-btn').style.display    = 'none';
-  document.getElementById('intel-active-row').style.display = 'flex';
-  const cdEl = document.getElementById('intel-countdown');
-  if (cdEl) { cdEl.textContent = fmtSecs(TACTICAL_SECS); cdEl.style.color = ''; }
+  // Stop any active drift accumulator immediately
+  clearInterval(window._NL_DRIFT);
+  window._NL_DRIFT = null;
+
+  // UI
+  const tacBtn = document.getElementById('tactical-btn');
+  const row    = document.getElementById('intel-active-row');
+  const cdEl   = document.getElementById('intel-countdown');
+  if (tacBtn) tacBtn.style.display = 'none';
+  if (row)    row.style.display    = 'flex';
+  if (cdEl)   { cdEl.textContent = fmtSecs(TACTICAL_SECS); cdEl.style.color = ''; }
 
   log(`TACTICAL MODE ENGAGED — ${TACTICAL_SECS}s window. Drift penalty suspended.`, 'warn');
   speakTactical('Tactical mode engaged. Three minutes authorized. Return before window expires.');
   toast('TACTICAL MODE: 3:00');
 
-  // Countdown interval
   clearInterval(window._NL_TACTICAL);
   window._NL_TACTICAL = setInterval(() => {
     S.tacticalSecondsLeft--;
     if (cdEl) {
       cdEl.textContent = fmtSecs(S.tacticalSecondsLeft);
-      if (S.tacticalSecondsLeft <= 10 && S.tacticalSecondsLeft > 0) {
-        cdEl.style.color = '#ff0055';
-      }
+      if (S.tacticalSecondsLeft <= 10 && S.tacticalSecondsLeft > 0) cdEl.style.color = '#ff0055';
     }
     if (S.tacticalSecondsLeft <= 0) {
       clearInterval(window._NL_TACTICAL);
       window._NL_TACTICAL = null;
       S.isTacticalMode    = false;
-      // If still hidden when window expires → trigger breach
       if (document.hidden) {
         triggerCriticalBreach();
       } else {
-        // Expired but user is back — just warn
         speakTactical('Tactical window expired.');
         log('TACTICAL WINDOW EXPIRED — Drift protection lifted.', 'pink');
         toast('TACTICAL EXPIRED', true);
@@ -741,7 +762,7 @@ function activateTactical() {
   }, 1000);
 }
 
-// Alias — keeps backward compat with any onclick="startExteriorIntel()"
+// Alias for any legacy references
 function startExteriorIntel() { activateTactical(); }
 
 function restoreLink() {
@@ -749,6 +770,11 @@ function restoreLink() {
   clearInterval(window._NL_TACTICAL);
   window._NL_TACTICAL = null;
   S.isTacticalMode    = false;
+
+  // Stop drift accumulator in case it somehow started during tactical
+  clearInterval(window._NL_DRIFT);
+  window._NL_DRIFT = null;
+
   resetTacticalUI();
   log('COMM-LINK RESTORED — Tactical mode disengaged. Sync resuming.', 'cyan');
   speakTactical('Comm-link restored. Tactical mode disengaged. Welcome back.');
@@ -756,14 +782,12 @@ function restoreLink() {
 }
 
 function resetTacticalUI() {
-  const btnI  = document.getElementById('btn-intel');
-  const btnT  = document.getElementById('tactical-btn');
-  const row   = document.getElementById('intel-active-row');
-  const cd    = document.getElementById('intel-countdown');
-  if (btnI)  btnI.style.display  = 'flex';
-  if (btnT)  btnT.style.display  = 'flex';
-  if (row)   row.style.display   = 'none';
-  if (cd)    { cd.textContent = ''; cd.style.color = ''; }
+  const tacBtn = document.getElementById('tactical-btn');
+  const row    = document.getElementById('intel-active-row');
+  const cd     = document.getElementById('intel-countdown');
+  if (tacBtn) tacBtn.style.display = 'flex';
+  if (row)    row.style.display    = 'none';
+  if (cd)     { cd.textContent = ''; cd.style.color = ''; }
 }
 
 function triggerCriticalBreach() {
@@ -776,7 +800,6 @@ function triggerCriticalBreach() {
   pushNotif('CRITICAL BREACH', 'Tactical window expired. Return now.');
   log('CRITICAL BREACH — Tactical window expired. Drift count +1.', 'pink');
   toast('CRITICAL BREACH', true);
-  // Auto-dismiss breach overlay after 5s
   setTimeout(() => setBreach(false), 5000);
 }
 
@@ -795,16 +818,22 @@ function setBreach(active) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  VISIBILITY API — DRIFT SECONDS ACCUMULATOR
+//  VISIBILITY API — TAB-SWITCH DETECTION ONLY
 //
-//  This is where driftSeconds actually accumulates.
-//  The masterTick only increments focusSeconds when visible.
-//  driftSeconds grows here in a separate interval while hidden,
-//  but ONLY if isTacticalMode is FALSE.
+//  KEY DESIGN DECISION:
+//  The browser fires visibilitychange for BOTH:
+//    (a) User switches to a different tab/URL  ← DRIFT (penalise)
+//    (b) Screen turns off / app goes to background ← NOT DRIFT
 //
-//  This separation ensures the formula
-//    syncRate = focusSeconds / (focusSeconds + driftSeconds) * 100
-//  works correctly regardless of tick timing.
+//  We cannot reliably distinguish (a) from (b) via the API alone.
+//  Our solution:
+//    • WakeLock keeps the screen alive → case (b) shouldn't trigger
+//      visibilitychange at all in most browsers
+//    • If visibilitychange does fire (e.g. user pulls down notification
+//      shade, which counts as "hidden" on some Android browsers),
+//      we apply a 5-second grace period before counting drift
+//    • The Date.now() catchup in masterTick handles any missed time
+//      from genuine screen-off / OS suspension without penalising
 // ═══════════════════════════════════════════════════════════════
 let _hiddenAt = null;
 
@@ -814,27 +843,27 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     _hiddenAt = Date.now();
 
-    // Start accumulating drift after 5s grace period
+    // Grace period before penalising — screen-off events are usually
+    // very brief and the browser resumes within milliseconds
     setTimeout(() => {
       if (!document.hidden || !S.uplinkActive) return;
 
-      // ── isTacticalMode ON → no drift, no penalty ──
+      // Tactical mode is active → no drift regardless
       if (S.isTacticalMode) {
-        log('Tab hidden — Tactical Mode active. Drift suspended.', 'warn');
+        log('Hidden — Tactical Mode active. Drift suppressed.', 'warn');
         return;
       }
 
-      // ── isTacticalMode OFF → start drift accumulator ──
+      // Still hidden after 5s → treat as explicit tab switch
       S.driftCount++;
       S.ghostSeconds = 0;
-      log('DRIFT DETECTED — tab hidden without Tactical Mode.', 'pink');
+      log('DRIFT DETECTED — explicit tab switch detected.', 'pink');
       pushNotif('DRIFT DETECTED', 'Return to NEURAL LINK.');
 
       // Accumulate driftSeconds every second while hidden
       clearInterval(window._NL_DRIFT);
       window._NL_DRIFT = setInterval(() => {
         if (!document.hidden || !S.uplinkActive || S.isTacticalMode) {
-          // Stop accumulating: back to visible, uplink off, or tactical engaged
           clearInterval(window._NL_DRIFT);
           window._NL_DRIFT = null;
           return;
@@ -842,10 +871,10 @@ document.addEventListener('visibilitychange', () => {
         S.driftSeconds++;
       }, 1000);
 
-    }, 5000); // 5s grace before drift kicks in
+    }, 5000);
 
   } else {
-    // ── Returned to tab ──
+    // Returned to tab
     const away = _hiddenAt ? Math.round((Date.now() - _hiddenAt) / 1000) : 0;
     _hiddenAt = null;
 
@@ -856,18 +885,26 @@ document.addEventListener('visibilitychange', () => {
     if (S.inBreach) {
       setBreach(false);
       log(`Uplink reestablished after ${away}s. Sync recovering.`, 'warn');
-      speak('Uplink restored. Sync recovering. Stay on the charts.');
+      speakTactical('Sync degrading. Return to terminal immediately.');
       toast('DRIFT ENDED', true);
     }
+  }
+});
+
+// Re-acquire WakeLock when page becomes visible again
+// (OS releases it automatically on screen-off)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && S.uplinkActive && !_wakeLock) {
+    acquireWakeLock();
   }
 });
 
 // ── EXPOSE GLOBALS ─────────────────────────────────────────────
 window.toggleUplink           = toggleUplink;
 window.toggleAudio            = toggleAudio;
-window.activateTactical       = activateTactical;       // canonical
-window.startExteriorIntel     = startExteriorIntel;     // alias
-window.startTacticalMode      = activateTactical;       // alias for tactical-btn
+window.activateTactical       = activateTactical;
+window.startExteriorIntel     = startExteriorIntel;
+window.startTacticalMode      = activateTactical;
 window.restoreLink            = restoreLink;
 window.requestNotifPermission = requestNotifPermission;
 
@@ -890,15 +927,15 @@ window.requestNotifPermission = requestNotifPermission;
 
   document.getElementById('clock').textContent = hhmmss(getIST());
 
-  // Passive tick: clock + cards even before uplink
+  // Passive tick: clock + cards before uplink
   setInterval(() => {
     document.getElementById('clock').textContent = hhmmss(getIST());
     refreshCards();
   }, 1000);
 
-  // Terminal boot sequence
+  // Terminal boot messages
   setTimeout(() => {
-    log('All systems nominal. Awaiting uplink command.', '');
+    log('All systems nominal. WakeLock ready. Awaiting uplink.', '');
     log('London 12:30–14:30 IST  |  New York 17:30–20:00 IST', 'cyan');
     log('Press START UPLINK to engage sync engine.', '');
   }, 400);
