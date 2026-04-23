@@ -1,10 +1,45 @@
 // ═══════════════════════════════════════════════════════════════
-// NEURAL LINK — app.js  |  System Overhaul
+// NEURAL LINK — app.js  |  Cloud Vault Edition
+// Supabase Project: rlatlwyksxakqgwmarvf (Global War Room vault)
 // ═══════════════════════════════════════════════════════════════
+
+// ── SUPABASE CONFIG ────────────────────────────────────────────
+const SUPA_URL = 'https://rlatlwyksxakqgwmarvf.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsYXRsd3lrc3hha3Fnd21hcnZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMDQyNDcsImV4cCI6MjA5MDU4MDI0N30.CbjYYe1Y9TIt6WEiAVfIBjxgf49fv5a8DpFu9L7Hz8o';
+const APP_ID   = 'neural-link';
+
+// Supabase REST helper — no SDK needed, pure fetch
+const supa = {
+  async upsert(table, payload) {
+    const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+      method:  'POST',
+      headers: {
+        'apikey':        SUPA_KEY,
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'resolution=merge-duplicates,return=representation',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Supabase upsert failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  },
+
+  async select(table, filter = '') {
+    const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${filter}`, {
+      headers: {
+        'apikey':        SUPA_KEY,
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type':  'application/json',
+      },
+    });
+    if (!res.ok) throw new Error(`Supabase select failed: ${res.status}`);
+    return res.json();
+  },
+};
 
 // ── SVG ICON LIBRARY ────────────────────────────────────────────
 const ICONS = {
-
   power: `<svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
     <polyline points="13,2 5,13 12,13 11,22 19,11 12,11"
       fill="#00f3ff" stroke="#00f3ff" stroke-width="0.5" stroke-linejoin="round"/>
@@ -53,8 +88,7 @@ const ICONS = {
   </svg>`,
 
   bolt: `<svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24"
-      fill="none" stroke="#00f3ff" stroke-width="2"
-      stroke-linecap="round" stroke-linejoin="round">
+      fill="none" stroke="#00f3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="rgba(0,243,255,0.15)"/>
   </svg>`,
 
@@ -66,8 +100,7 @@ const ICONS = {
   </svg>`,
 
   shield: `<svg class="svg-icon svg-pink" width="20" height="20" viewBox="0 0 24 24"
-      fill="none" stroke="#ff0055" stroke-width="2"
-      stroke-linecap="round" stroke-linejoin="round">
+      fill="none" stroke="#ff0055" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8 5.8a2.8 2.8 0 00-3.4 3 3 3 0 004.4 3.5v.1c0 2 1.4 3.1 2.8 3.5
              1.5.4 2.2-.3 2.2-1.5 0-1.2-.5-2.2-2-3a3 3 0 01-1.5-2.8c0-1 .4-1.9 1-2.6z"
       fill="rgba(255,0,85,0.1)"/>
@@ -126,37 +159,126 @@ const BOUNTIES = [
 // ── STATE ──────────────────────────────────────────────────────
 const S = {
   uplinkActive:        false,
-
-  // Sync counters
   focusSeconds:        0,
   driftSeconds:        0,
-
-  // Tactical mode
   isTacticalMode:      false,
   tacticalSecondsLeft: 0,
-
-  // Gamification
   ghostSeconds:        0,
   driftCount:          0,
   inBreach:            false,
-
-  // Session
   sessionsCompleted:   [],
   announced:           {},
-
-  // Persisted
+  // Persisted (cloud + local)
   xp:                  0,
   focusMinutes:        0,
   claimedBounties:     [],
   streak:              0,
   lastTradeDate:       null,
+  // Cloud sync state
+  cloudLoaded:         false,
 };
 
-// ── PERSIST ────────────────────────────────────────────────────
-function save() {
+// ═══════════════════════════════════════════════════════════════
+//  CLOUD SYNC — SUPABASE universal_stats
+//
+//  Table schema (run in Supabase SQL Editor):
+//  ┌─────────────────────────────────────────────────────────┐
+//  │  CREATE TABLE IF NOT EXISTS universal_stats (           │
+//  │    app_id          TEXT PRIMARY KEY,                    │
+//  │    xp              INTEGER DEFAULT 0,                   │
+//  │    rank_name       TEXT DEFAULT 'GLITCH-RUNNER',        │
+//  │    focus_minutes   INTEGER DEFAULT 0,                   │
+//  │    drift_count     INTEGER DEFAULT 0,                   │
+//  │    claimed_bounties TEXT[] DEFAULT '{}',                │
+//  │    streak          INTEGER DEFAULT 0,                   │
+//  │    last_trade_date TEXT,                                │
+//  │    last_synced_at  TIMESTAMPTZ DEFAULT NOW()            │
+//  │  );                                                     │
+//  │  ALTER TABLE universal_stats ENABLE ROW LEVEL SECURITY; │
+//  │  CREATE POLICY "anon_all" ON universal_stats            │
+//  │    FOR ALL TO anon USING (true) WITH CHECK (true);      │
+//  └─────────────────────────────────────────────────────────┘
+// ═══════════════════════════════════════════════════════════════
+
+// Push current state to Supabase
+async function syncToCloud() {
+  const rank = getRank();
+  const payload = {
+    app_id:          APP_ID,
+    xp:              S.xp,
+    rank_name:       rank.name,
+    focus_minutes:   S.focusMinutes,
+    drift_count:     S.driftCount,
+    claimed_bounties: S.claimedBounties,
+    streak:          S.streak,
+    last_trade_date: S.lastTradeDate,
+    last_synced_at:  new Date().toISOString(),
+  };
+
+  try {
+    await supa.upsert('universal_stats', payload);
+    log('Cloud vault synced. Data secured.', 'cyan');
+    flashCloudBadge(true);
+  } catch (e) {
+    log('Cloud sync failed — data saved locally. ' + e.message, 'warn');
+    flashCloudBadge(false);
+  }
+}
+
+// Pull latest stats from Supabase
+// Returns true if cloud data was found and applied
+async function loadFromCloud() {
+  try {
+    const rows = await supa.select('universal_stats', `app_id=eq.${APP_ID}&limit=1`);
+    if (!rows || rows.length === 0) {
+      log('No cloud vault found. Starting fresh.', 'warn');
+      return false;
+    }
+    const d = rows[0];
+    // Only apply cloud data if it's ahead of local
+    const cloudXP = d.xp || 0;
+    if (cloudXP >= S.xp) {
+      S.xp              = cloudXP;
+      S.focusMinutes    = d.focus_minutes    || 0;
+      S.streak          = d.streak           || 0;
+      S.lastTradeDate   = d.last_trade_date  || null;
+      S.claimedBounties = d.claimed_bounties || [];
+      saveLocal();
+      log(`Cloud vault loaded. XP: ${S.xp} | Rank: ${d.rank_name}`, 'cyan');
+      flashCloudBadge(true);
+      return true;
+    }
+    log('Local data is ahead of cloud. Keeping local.', 'warn');
+    return false;
+  } catch (e) {
+    log('Cloud vault unreachable. Using local data. ' + e.message, 'warn');
+    return false;
+  }
+}
+
+// ── Cloud sync badge flash ──────────────────────────────────────
+function flashCloudBadge(success) {
+  const el = document.getElementById('cloud-badge');
+  if (!el) return;
+  el.textContent = success ? '☁ SYNCED' : '☁ OFFLINE';
+  el.style.color = success ? 'var(--c)' : '#ffcc00';
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0.4'; }, 2000);
+}
+
+// Debounced cloud sync — avoids hammering on every XP tick
+let _syncTimer = null;
+function scheduleSyncToCloud(delayMs = 3000) {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(syncToCloud, delayMs);
+}
+
+// ── LOCAL STORAGE (fallback) ────────────────────────────────────
+function saveLocal() {
   try {
     localStorage.setItem('nl_v3', JSON.stringify({
       xp:              S.xp,
+      focusMinutes:    S.focusMinutes,
       streak:          S.streak,
       lastTradeDate:   S.lastTradeDate,
       claimedBounties: S.claimedBounties,
@@ -164,24 +286,29 @@ function save() {
   } catch (_) {}
 }
 
-function load() {
+function loadLocal() {
   try {
     const d = JSON.parse(localStorage.getItem('nl_v3') || '{}');
-    S.xp              = d.xp             || 0;
+    S.xp              = d.xp              || 0;
+    S.focusMinutes    = d.focusMinutes    || 0;
     S.streak          = d.streak          || 0;
     S.lastTradeDate   = d.lastTradeDate   || null;
     S.claimedBounties = d.claimedBounties || [];
   } catch (_) {}
 }
 
-// ── GLOBAL INTERVAL HANDLES (window-scoped, immune to GC) ──────
-window._NL_TICK     = null;   // 1s master tick
-window._NL_TACTICAL = null;   // tactical countdown
-window._NL_DRIFT    = null;   // drift accumulator (explicit tab-switch only)
+// Unified save — local immediately, cloud debounced
+function save() {
+  saveLocal();
+  scheduleSyncToCloud();
+}
+
+// ── GLOBAL INTERVAL HANDLES ────────────────────────────────────
+window._NL_TICK     = null;
+window._NL_TACTICAL = null;
+window._NL_DRIFT    = null;
 
 // ── WAKE LOCK ──────────────────────────────────────────────────
-// Prevents screen from dimming while uplink is active.
-// Pocket/screen-off is handled by the OS and does NOT count as drift.
 let _wakeLock = null;
 
 async function acquireWakeLock() {
@@ -189,9 +316,7 @@ async function acquireWakeLock() {
   try {
     _wakeLock = await navigator.wakeLock.request('screen');
     log('WakeLock acquired. Screen will stay active.', 'cyan');
-    // Re-acquire if released by OS (e.g. after screen unlock)
     _wakeLock.addEventListener('release', () => {
-      log('WakeLock released by OS. Re-acquiring...', 'warn');
       if (S.uplinkActive) acquireWakeLock();
     });
   } catch (e) {
@@ -238,7 +363,6 @@ function getSessionInfo(key) {
   const start = toMins(s.startH, s.startM);
   const end   = toMins(s.endH,   s.endM);
   const total = end - start;
-
   if (now >= start && now < end) {
     return {
       status:    'active',
@@ -277,8 +401,8 @@ function buildAmbience() {
   };
   const gain = v => { const g = _ctx.createGain(); g.gain.value = v; return g; };
 
-  const bass  = osc('sine', 48);      const bassG  = gain(0.28);
-  const lfo   = osc('sine', 0.25);    const lfoG   = gain(5);
+  const bass  = osc('sine', 48);       const bassG  = gain(0.28);
+  const lfo   = osc('sine', 0.25);     const lfoG   = gain(5);
   lfo.connect(lfoG); lfoG.connect(bass.frequency);
   bass.connect(bassG); bassG.connect(_master);
 
@@ -348,17 +472,16 @@ function speak(text, rate = 0.85, pitch = 0.65) {
   u.rate = rate; u.pitch = pitch; u.volume = 0.95;
   const voices = window.speechSynthesis.getVoices();
   const v = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('uk'))
-         || voices.find(v => v.lang.startsWith('en'))
-         || voices[0];
+         || voices.find(v => v.lang.startsWith('en')) || voices[0];
   if (v) u.voice = v;
   window.speechSynthesis.speak(u);
 }
 
-// Robotic female voice — used exclusively for tactical alerts
+// Robotic female voice for tactical alerts
 function speakTactical(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const u      = new SpeechSynthesisUtterance(text);
+  const u       = new SpeechSynthesisUtterance(text);
   u.rate = 0.82; u.pitch = 1.1; u.volume = 0.95;
   const voices  = window.speechSynthesis.getVoices();
   const femaleV = voices.find(v =>
@@ -488,15 +611,16 @@ function checkBounties() {
   BOUNTIES.forEach(b => {
     if (S.claimedBounties.includes(b.id)) return;
     let ok = false;
-    if (!b.special              && S.focusSeconds >= b.xpReq)            ok = true;
+    if (!b.special              && S.focusSeconds >= b.xpReq)                 ok = true;
     if (b.special === 'nodrift' && S.driftCount === 0 && S.focusSeconds >= 600) ok = true;
-    if (b.special === 'ghost30' && S.ghostSeconds >= 1800)                ok = true;
-    if (b.special === 'double'  && S.sessionsCompleted.length >= 2)       ok = true;
-    if (b.special === 'streak3' && S.streak >= 3)                         ok = true;
+    if (b.special === 'ghost30' && S.ghostSeconds >= 1800)                     ok = true;
+    if (b.special === 'double'  && S.sessionsCompleted.length >= 2)            ok = true;
+    if (b.special === 'streak3' && S.streak >= 3)                              ok = true;
     if (!ok) return;
 
     S.claimedBounties.push(b.id);
-    S.xp += 25; save();
+    S.xp += 25;
+    save(); // triggers local save + scheduled cloud sync
     renderBounties();
     log(`BOUNTY UNLOCKED: ${b.name} +25 XP`, 'cyan');
     speak(`Bounty unlocked. ${b.name}. Twenty five XP awarded.`);
@@ -548,63 +672,65 @@ function checkAnnouncements(info, key) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  SYNC ENGINE — MASTER TICK  (fires every 1s via _NL_TICK)
+//  SYNC ENGINE — MASTER TICK (1s interval)
 //
-//  FORMULA: syncRate = focusSeconds / (focusSeconds + driftSeconds) * 100
+//  syncRate = focusSeconds / (focusSeconds + driftSeconds) * 100
 //
-//  focusSeconds: increments here — only when document is VISIBLE
-//  driftSeconds: increments in visibilitychange — only on EXPLICIT
-//                tab-switch, NOT screen-off / pocket / OS pause
+//  All time tracking uses Date.now() wall-clock differences, NOT
+//  simple counter increments. This means if the OS throttles or
+//  suspends the browser (pocket mode), focusSeconds catches up
+//  to the real elapsed time the moment the screen is viewed again.
 //
-//  Date.now() CATCHUP: on every tick, compare against _lastTickAt.
-//  If the OS paused the browser (pocket mode), elapsed wall-clock
-//  time is detected on resume and focusSeconds catches up instantly
-//  without penalty, keeping sync accurate.
+//  _uplinkStartAt  — Date.now() when uplink was pressed
+//  _totalPausedMs  — accumulated ms of drift/tab-switch time
+//                    (only time we were hidden + NOT tactical)
+//  focusSeconds    — (now - _uplinkStartAt - _totalPausedMs) / 1000
+//
+//  Intelligent re-sync on resume (Patch 3):
+//  When returning to the tab, we check if we're still inside a
+//  session window. If yes, tracking resumes seamlessly without reset.
 // ═══════════════════════════════════════════════════════════════
-let _lastTickAt = null;  // Date.now() of the previous tick
+let _uplinkStartAt  = null;  // Date.now() when uplink started
+let _totalPausedMs  = 0;     // total ms spent in drift state (tab-switch only)
+let _driftStartAt   = null;  // Date.now() when current drift period started
 
 function masterTick() {
   if (!S.uplinkActive) return;
 
   const now = Date.now();
-
-  // ── Date.now() catchup ─────────────────────────────────────
-  // If the OS froze us (pocket mode, screen off), _lastTickAt will
-  // be stale. We detect the gap and credit focusSeconds for the
-  // missed time — since screen-off is NOT drift, just absence.
-  if (_lastTickAt !== null) {
-    const elapsed = Math.round((now - _lastTickAt) / 1000);
-    if (elapsed > 2) {
-      // More than 2s gap → we were suspended by the OS
-      // Credit missed focus time (screen was off, not tab-switched)
-      const catchup = elapsed - 1; // subtract the 1s we're about to add below
-      S.focusSeconds  += catchup;
-      S.ghostSeconds  += catchup;
-      log(`OS resume detected. Catchup: +${catchup}s focus credited.`, 'warn');
-    }
-  }
-  _lastTickAt = now;
-
-  // Clock display
   document.getElementById('clock').textContent = hhmmss(getIST());
 
-  // ── Increment focusSeconds (visible time only) ──────────────
-  if (!document.hidden) {
-    S.focusSeconds++;
-    S.ghostSeconds++;
+  // ── Wall-clock focusSeconds ─────────────────────────────────
+  // Total elapsed since uplink start, minus any drift pauses.
+  // This auto-catches-up after OS suspension — no manual logic needed.
+  const wallElapsedMs = now - _uplinkStartAt;
+  const newFocusSecs  = Math.floor((wallElapsedMs - _totalPausedMs) / 1000);
 
-    // XP: 1 per focus minute, during a live session only
+  // Clamp to non-negative, never go backwards
+  if (newFocusSecs > S.focusSeconds) {
+    const delta = newFocusSecs - S.focusSeconds;
+    S.focusSeconds  = newFocusSecs;
+    S.ghostSeconds += delta;
+
+    // XP: award for each new focus minute crossed, session only
     const lI = getSessionInfo('london');
     const nI = getSessionInfo('ny');
-    if ((lI.status === 'active' || nI.status === 'active') && S.focusSeconds % 60 === 0) {
-      S.focusMinutes++;
-      S.xp++;
-      save();
+    const inSession = lI.status === 'active' || nI.status === 'active';
+    const newMins = Math.floor(S.focusSeconds / 60);
+    if (inSession && newMins > S.focusMinutes) {
+      const xpGained = newMins - S.focusMinutes;
+      S.focusMinutes = newMins;
+      S.xp          += xpGained;
+      save(); // local + debounced cloud
       checkBounties();
       log(`Focus: ${S.focusMinutes}m | XP: ${S.xp}`, '');
     }
-    checkAnnouncements(lI, 'london');
-    checkAnnouncements(nI, 'ny');
+
+    // Only fire announcements when visible
+    if (!document.hidden) {
+      checkAnnouncements(lI, 'london');
+      checkAnnouncements(nI, 'ny');
+    }
   }
 
   // ── Sync rate ───────────────────────────────────────────────
@@ -615,8 +741,7 @@ function masterTick() {
   const lI2 = getSessionInfo('london');
   const nI2 = getSessionInfo('ny');
   const activeSession = lI2.status === 'active' ? lI2
-                      : nI2.status === 'active' ? nI2
-                      : null;
+                      : nI2.status === 'active' ? nI2 : null;
   const timerLabel = activeSession
     ? fmtMinsLabel(activeSession.remaining * 60) + ' LEFT'
     : fmtSecs(S.focusSeconds) + ' UPLINK';
@@ -636,27 +761,28 @@ function toggleUplink() {
   S.uplinkActive = !S.uplinkActive;
 
   if (S.uplinkActive) {
-    // Full state reset
-    S.focusSeconds       = 0;
-    S.driftSeconds       = 0;
-    S.ghostSeconds       = 0;
-    S.driftCount         = 0;
-    S.isTacticalMode     = false;
+    S.focusSeconds        = 0;
+    S.driftSeconds        = 0;
+    S.ghostSeconds        = 0;
+    S.driftCount          = 0;
+    S.isTacticalMode      = false;
     S.tacticalSecondsLeft = 0;
-    S.inBreach           = false;
-    S.sessionsCompleted  = [];
-    S.announced          = {};
-    _lastTickAt          = null;
+    S.inBreach            = false;
+    S.sessionsCompleted   = [];
+    S.announced           = {};
+
+    // Wall-clock tracking — reset on each new uplink session
+    _uplinkStartAt  = Date.now();
+    _totalPausedMs  = 0;
+    _driftStartAt   = null;
 
     clearInterval(window._NL_TACTICAL);
     clearInterval(window._NL_DRIFT);
     window._NL_TACTICAL = null;
     window._NL_DRIFT    = null;
 
-    // Acquire WakeLock to keep screen alive during trading
     acquireWakeLock();
 
-    // UI
     document.getElementById('btn-uplink').innerHTML = ICONS.terminate + '<span>TERMINATE UPLINK</span>';
     document.getElementById('btn-uplink').classList.add('active');
     document.getElementById('uplink-dot').classList.add('active');
@@ -664,11 +790,10 @@ function toggleUplink() {
     document.getElementById('intel-zone').style.display  = 'flex';
     setBreach(false);
 
-    log('Uplink initialized. WakeLock armed. Neural sync engaged.', 'cyan');
+    log('Uplink initialized. WakeLock armed. Cloud vault connected.', 'cyan');
     speak('Neural link established. Focus protocol active. Watch the charts.');
     toast('UPLINK ONLINE');
 
-    // Fire tick immediately (shows 100% sync on first frame)
     clearInterval(window._NL_TICK);
     window._NL_TICK = setInterval(masterTick, 1000);
     masterTick();
@@ -683,9 +808,12 @@ function toggleUplink() {
 
     S.isTacticalMode = false;
     S.inBreach       = false;
-    _lastTickAt      = null;
+    _uplinkStartAt   = null;
+    _totalPausedMs   = 0;
+    _driftStartAt    = null;
 
     releaseWakeLock();
+    syncToCloud(); // final cloud sync on session end
 
     document.getElementById('btn-uplink').innerHTML = ICONS.power + '<span>START UPLINK</span>';
     document.getElementById('btn-uplink').classList.remove('active');
@@ -700,7 +828,7 @@ function toggleUplink() {
     document.getElementById('clock').textContent = hhmmss(getIST());
 
     const mins = Math.floor(S.focusSeconds / 60);
-    log(`Uplink terminated. ${mins}m focused. Session archived.`, 'pink');
+    log(`Uplink terminated. ${mins}m focused. Data synced to vault.`, 'pink');
     speak('Uplink severed. Session archived. Stand down, netrunner.');
     toast('UPLINK OFFLINE', true);
   }
@@ -708,10 +836,6 @@ function toggleUplink() {
 
 // ═══════════════════════════════════════════════════════════════
 //  TACTICAL MODE — EXTERIOR INTEL
-//
-//  activateTactical(): suspends drift penalties for 180 seconds.
-//  During this window, tab-hidden events are silently ignored.
-//  Female robotic voice for all tactical announcements.
 // ═══════════════════════════════════════════════════════════════
 const TACTICAL_SECS = 180;
 
@@ -723,11 +847,9 @@ function activateTactical() {
   S.inBreach            = false;
   setBreach(false);
 
-  // Stop any active drift accumulator immediately
   clearInterval(window._NL_DRIFT);
   window._NL_DRIFT = null;
 
-  // UI
   const tacBtn = document.getElementById('tactical-btn');
   const row    = document.getElementById('intel-active-row');
   const cdEl   = document.getElementById('intel-countdown');
@@ -735,7 +857,7 @@ function activateTactical() {
   if (row)    row.style.display    = 'flex';
   if (cdEl)   { cdEl.textContent = fmtSecs(TACTICAL_SECS); cdEl.style.color = ''; }
 
-  log(`TACTICAL MODE ENGAGED — ${TACTICAL_SECS}s window. Drift penalty suspended.`, 'warn');
+  log(`TACTICAL MODE ENGAGED — ${TACTICAL_SECS}s window. Drift suspended.`, 'warn');
   speakTactical('Tactical mode engaged. Three minutes authorized. Return before window expires.');
   toast('TACTICAL MODE: 3:00');
 
@@ -762,7 +884,6 @@ function activateTactical() {
   }, 1000);
 }
 
-// Alias for any legacy references
 function startExteriorIntel() { activateTactical(); }
 
 function restoreLink() {
@@ -770,11 +891,8 @@ function restoreLink() {
   clearInterval(window._NL_TACTICAL);
   window._NL_TACTICAL = null;
   S.isTacticalMode    = false;
-
-  // Stop drift accumulator in case it somehow started during tactical
   clearInterval(window._NL_DRIFT);
-  window._NL_DRIFT = null;
-
+  window._NL_DRIFT    = null;
   resetTacticalUI();
   log('COMM-LINK RESTORED — Tactical mode disengaged. Sync resuming.', 'cyan');
   speakTactical('Comm-link restored. Tactical mode disengaged. Welcome back.');
@@ -808,32 +926,28 @@ function setBreach(active) {
   S.inBreach = active;
   const o = document.getElementById('breach-overlay');
   if (!o) return;
-  if (active) {
-    o.style.display = 'flex';
-    o.classList.add('breach-alarm');
-  } else {
-    o.style.display = 'none';
-    o.classList.remove('breach-alarm');
-  }
+  if (active) { o.style.display = 'flex'; o.classList.add('breach-alarm'); }
+  else        { o.style.display = 'none'; o.classList.remove('breach-alarm'); }
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  VISIBILITY API — TAB-SWITCH DETECTION ONLY
+//  Screen-off / pocket: handled by WakeLock + Date.now() catchup
+//  Drift only fires on explicit 5s+ hidden = real tab switch
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  VISIBILITY API — TAB-SWITCH DETECTION ONLY (Patches 2, 3 & 4)
 //
-//  KEY DESIGN DECISION:
-//  The browser fires visibilitychange for BOTH:
-//    (a) User switches to a different tab/URL  ← DRIFT (penalise)
-//    (b) Screen turns off / app goes to background ← NOT DRIFT
+//  document.hidden fires for BOTH tab-switch AND screen-off.
+//  WakeLock keeps the screen alive, so screen-off rarely fires.
+//  For any case where it does (OS forced lock, notification bar),
+//  the wall-clock math in masterTick handles catchup automatically.
 //
-//  We cannot reliably distinguish (a) from (b) via the API alone.
-//  Our solution:
-//    • WakeLock keeps the screen alive → case (b) shouldn't trigger
-//      visibilitychange at all in most browsers
-//    • If visibilitychange does fire (e.g. user pulls down notification
-//      shade, which counts as "hidden" on some Android browsers),
-//      we apply a 5-second grace period before counting drift
-//    • The Date.now() catchup in masterTick handles any missed time
-//      from genuine screen-off / OS suspension without penalising
+//  Drift is only counted when hidden 5s+ without Tactical Mode.
+//  On return: intelligent re-sync checks if session is still live.
+//
+//  Patch 4 — #intel-zone guard: hidden by default, only shown
+//  when uplink is active (enforced in toggleUplink, not here).
 // ═══════════════════════════════════════════════════════════════
 let _hiddenAt = null;
 
@@ -843,24 +957,24 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     _hiddenAt = Date.now();
 
-    // Grace period before penalising — screen-off events are usually
-    // very brief and the browser resumes within milliseconds
+    // 5-second grace — handles notification shades, brief locks
     setTimeout(() => {
       if (!document.hidden || !S.uplinkActive) return;
 
-      // Tactical mode is active → no drift regardless
+      // Tactical Mode active — suppress all drift
       if (S.isTacticalMode) {
         log('Hidden — Tactical Mode active. Drift suppressed.', 'warn');
         return;
       }
 
-      // Still hidden after 5s → treat as explicit tab switch
+      // Still hidden after 5s → explicit tab-switch, count drift
+      _driftStartAt = Date.now();
       S.driftCount++;
       S.ghostSeconds = 0;
-      log('DRIFT DETECTED — explicit tab switch detected.', 'pink');
+      log('DRIFT DETECTED — tab switched. Drift accumulating.', 'pink');
       pushNotif('DRIFT DETECTED', 'Return to NEURAL LINK.');
 
-      // Accumulate driftSeconds every second while hidden
+      // Accumulate driftSeconds in parallel with masterTick
       clearInterval(window._NL_DRIFT);
       window._NL_DRIFT = setInterval(() => {
         if (!document.hidden || !S.uplinkActive || S.isTacticalMode) {
@@ -869,12 +983,14 @@ document.addEventListener('visibilitychange', () => {
           return;
         }
         S.driftSeconds++;
+        // Also add to _totalPausedMs so wall-clock focus doesn't credit this gap
+        _totalPausedMs += 1000;
       }, 1000);
 
     }, 5000);
 
   } else {
-    // Returned to tab
+    // ── Returned to tab ────────────────────────────────────────
     const away = _hiddenAt ? Math.round((Date.now() - _hiddenAt) / 1000) : 0;
     _hiddenAt = null;
 
@@ -882,21 +998,40 @@ document.addEventListener('visibilitychange', () => {
     clearInterval(window._NL_DRIFT);
     window._NL_DRIFT = null;
 
+    // If drift was actively counting, close out the paused window.
+    // Any hidden time shorter than 5s was a screen-off/notification
+    // shade — we do NOT add that to _totalPausedMs (free focus credit).
+    if (_driftStartAt) {
+      _driftStartAt = null;
+    }
+
+    // ── INTELLIGENT RE-SYNC (Patch 3) ─────────────────────────
+    // Check if we're still inside a trading session window.
+    // If yes: resume tracking seamlessly. No reset, no penalty beyond drift.
+    const lI = getSessionInfo('london');
+    const nI = getSessionInfo('ny');
+    const stillInSession = lI.status === 'active' || nI.status === 'active';
+
+    if (stillInSession) {
+      log(`Returned during active session after ${away}s. Sync resuming.`, 'cyan');
+    } else if (away > 0) {
+      log(`Returned after ${away}s. Session tracking continues.`, 'warn');
+    }
+
     if (S.inBreach) {
       setBreach(false);
-      log(`Uplink reestablished after ${away}s. Sync recovering.`, 'warn');
       speakTactical('Sync degrading. Return to terminal immediately.');
       toast('DRIFT ENDED', true);
     }
+
+    // Run a tick immediately on return so UI is instant
+    masterTick();
   }
 });
 
-// Re-acquire WakeLock when page becomes visible again
-// (OS releases it automatically on screen-off)
+// Re-acquire WakeLock on screen-on (OS releases it on lock)
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && S.uplinkActive && !_wakeLock) {
-    acquireWakeLock();
-  }
+  if (!document.hidden && S.uplinkActive && !_wakeLock) acquireWakeLock();
 });
 
 // ── EXPOSE GLOBALS ─────────────────────────────────────────────
@@ -907,13 +1042,21 @@ window.startExteriorIntel     = startExteriorIntel;
 window.startTacticalMode      = activateTactical;
 window.restoreLink            = restoreLink;
 window.requestNotifPermission = requestNotifPermission;
+window.syncToCloud            = syncToCloud; // expose for manual trigger if needed
 
 // ═══════════════════════════════════════════════════════════════
-//  BOOT
+//  BOOT — Cloud-first load sequence
 // ═══════════════════════════════════════════════════════════════
-(function boot() {
-  load();
+(async function boot() {
   registerSW();
+
+  // Step 1: Load local data immediately (instant UI)
+  loadLocal();
+
+  // Step 2: Try cloud vault — overwrite local if cloud is ahead
+  log('Connecting to cloud vault...', 'warn');
+  await loadFromCloud();
+  S.cloudLoaded = true;
 
   // Notification banner
   if (!('Notification' in window) || Notification.permission === 'granted') {
@@ -935,17 +1078,17 @@ window.requestNotifPermission = requestNotifPermission;
 
   // Terminal boot messages
   setTimeout(() => {
-    log('All systems nominal. WakeLock ready. Awaiting uplink.', '');
+    log('Neural Link v1.0 armed. Cloud vault connected.', 'cyan');
     log('London 12:30–14:30 IST  |  New York 17:30–20:00 IST', 'cyan');
     log('Press START UPLINK to engage sync engine.', '');
-  }, 400);
+  }, 600);
 
-  // AudioContext unlock on mobile (requires user gesture)
+  // AudioContext unlock on mobile
   const unlock = () => { if (_ctx && _ctx.state === 'suspended') _ctx.resume(); };
   document.addEventListener('touchstart', unlock, { once: true });
   document.addEventListener('click',      unlock, { once: true });
 
-  // Preload voices so speakTactical has them ready on first call
+  // Preload TTS voices
   if ('speechSynthesis' in window) {
     window.speechSynthesis.getVoices();
     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
